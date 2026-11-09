@@ -224,6 +224,17 @@ table.t th,table.t td{padding-left:3px;padding-right:3px}
 .seg{flex-wrap:wrap}
 .seg button{flex:1 1 auto;min-width:fit-content;white-space:nowrap;line-height:1.15}
 
+/* ===== Version 7 ===== */
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin:10px 0}
+.bdg{background:var(--card);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:2px;opacity:.55;overflow-wrap:anywhere;hyphens:auto}
+.bdg.on{opacity:1;box-shadow:inset 0 0 0 2px var(--ok)}.bdg .bi{font-size:24px;color:var(--warn)}.bdg small{color:var(--sub)}
+.zbtn{margin:6px 0 8px}
+#zoom{position:fixed;inset:0;z-index:50;background:var(--bg);overflow:auto;padding:calc(10px + env(safe-area-inset-top)) 14px calc(20px + env(safe-area-inset-bottom))}
+#zoom .zhead{display:flex;justify-content:space-between;align-items:center;gap:10px;position:sticky;top:0;background:var(--bg);padding:6px 0;z-index:1}
+#zoom .zfig{background:var(--card);border-radius:14px;padding:10px;margin:10px 0;color:var(--ink)}
+#dlcard input,#app .card input.date{min-height:44px;width:100%;box-sizing:border-box}
+#ivans{min-height:120px}
+.cmprow{display:flex;flex-direction:column;gap:2px;padding:8px 0;border-top:1px solid var(--sep,rgba(128,128,128,.2))}.cmprow small{color:var(--sub)}
 /* ===== Version 6 ===== */
 .kiext .row{margin:6px 0}.kiext .row .btn{flex:1 1 100%;white-space:normal}#aicard label{display:block;margin:8px 0 2px}#aicard select,#aicard input{width:100%;box-sizing:border-box;min-height:44px}
 /* ===== Version 5 ===== */
@@ -2747,7 +2758,7 @@ function render(){
       S.i=S.rv;S.cur=H.cur;S.hid50=H.hid50;S.sel=null;S.kz=H.kz;S._rv=true;
       try{h=`<div class="rvbar" role="status">Rückblick: bereits beantwortete Frage</div>`+navRow()+viewStep();}finally{S._rv=false;Object.assign(S,keep);}
     }else{S.rv=null;h=navRow()+viewStep();if(S.flashSkip){S.flashSkip=false;h=`<div class="toast pop">Übersprungen. Die Frage kommt am Ende der Runde.</div>`+h;}}
-  }else{const V={home:viewHome,learn:viewLearn,cat:()=>viewCat(viewArg),exam:viewExam,more:viewMore,stats:viewStats,backup:viewBackup,settings:viewSettings,info:viewInfo,interview:viewInterview,ablauf:viewAblauf,analyse:viewAnalyse,woche:viewWoche,methoden:viewMethoden,karten:viewKarten,notizen:viewNotizen,rep:viewRep,themen:viewThemen,marked:viewMarked,kartei:viewKartei,suche:viewSuche,fragenstand:viewFragenstand,rhythmus:viewRhythmus,diktat:viewDiktat,profil:viewProfil};h=(V[view]||viewHome)();}
+  }else{const V={home:viewHome,learn:viewLearn,cat:()=>viewCat(viewArg),exam:viewExam,more:viewMore,stats:viewStats,backup:viewBackup,settings:viewSettings,info:viewInfo,interview:viewInterview,ablauf:viewAblauf,analyse:viewAnalyse,woche:viewWoche,methoden:viewMethoden,karten:viewKarten,notizen:viewNotizen,rep:viewRep,themen:viewThemen,marked:viewMarked,kartei:viewKartei,suche:viewSuche,fragenstand:viewFragenstand,rhythmus:viewRhythmus,diktat:viewDiktat,profil:viewProfil};h=(V[view]||V7[view]||viewHome)();}
   if(notice&&!S)h=`<div class="warnbox" role="status">${esc(notice)}</div>`+h;
   $app.innerHTML=h;syncTop();
   if(S&&!S.done&&S.rv==null&&S.steps[S.i]&&S.steps[S.i].k==='q'&&S.qIdx!==S.i){S.qIdx=S.i;S.qT0=Date.now();}
@@ -2941,13 +2952,304 @@ document.addEventListener('click',ev=>{
   else if(a==='aidel'){aiSet(null);aiApply();aiMsg='Schlüssel gelöscht.';render();}
 });
 
-load();if(ST.set&&ST.set.tips==null)ST.set.tips=1;applyTheme();render();
+
+
+/* ===== Version 7: Prognose, Fehler-Turbo, Regel-Karten, Prüfungsvergleich, Abzeichen, Wochenbericht-Hinweis,
+   Teilen, Grafik vergrößern, Gespräch mit Stimme, Termine, Fitness ===== */
+var V7={};
+const fmtD=t=>new Date(t).toLocaleDateString('de-AT',{day:'numeric',month:'long',year:'numeric'});
+const dOnly=s=>{if(!s)return null;const d=new Date(s+'T00:00:00');return isNaN(d)?null:d;};
+function addMonths(s,n){const d=dOnly(s);if(!d)return null;const day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+n);const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();d.setDate(Math.min(day,last));return d;}
+function daysTo(d){const n=new Date();n.setHours(0,0,0,0);return Math.round((d-n)/DAY);}
+function extOpen(app,prompt){
+  if(navigator.onLine===false)return false;
+  const url=app==='claude'?'https://claude.ai/new?q='+encodeURIComponent(prompt):'https://chatgpt.com/?q='+encodeURIComponent(prompt);
+  try{if(navigator.clipboard)navigator.clipboard.writeText(prompt).catch(()=>{});}catch(e){}
+  window.open(url,'_blank','noopener');return true;
+}
+
+/* ---------- 1. Prognose bis zum Testtag ---------- */
+const READY=.8;
+/* Prüfungsreife zu einem früheren Zeitpunkt: aus dem Antwortprotokoll nachgebaut (gleiche Regeln wie die Statistik) */
+function readinessAt(T){const st0=ST.stat,stat={};
+  for(const e of ST.log||[]){if(e.t>T||e.m==='retry'||e.h)continue;const s=stat[e.c]||(stat[e.c]={n:0,ok:0,h:[]});s.n++;s.ok+=e.o;s.h.push([e.l||1,e.o]);if(s.h.length>60)s.h.shift();}
+  try{ST.stat=stat;return readiness();}finally{ST.stat=st0;}}
+function prognose(){
+  const R=readiness();if(!R.enough)return {state:'data',R};
+  if(R.total>=READY)return {state:'ready',R};
+  const N=readinessAt(Date.now());
+  for(const back of [14,7]){
+    const P=readinessAt(Date.now()-back*DAY);if(!P.enough)continue;
+    const slope=(N.total-P.total)/back;
+    if(slope<=.0005)return {state:'flat',R,back};
+    const d=Math.ceil((READY-R.total)/slope);if(d>365)return {state:'flat',R,back};
+    return {state:'trend',R,back,days:d,date:Date.now()+d*DAY};
+  }
+  return {state:'young',R};
+}
+function weakestCat(){const R=readiness(),a=AREA[R.weakest.id];let best=null;for(const c of a.cats){const s=catScore(c);if(!best||s.score<best.s)best={c,s:s.score};}return best&&best.c;}
+function progCard(){
+  const P=prognose(),dl=daysLeft();let t='';
+  if(P.state==='data')t=`Für eine Prognose brauche ich in jedem Bereich mindestens ${MINN} Antworten. Es fehlen noch: ${esc(P.R.missing.join(', '))}.`;
+  else if(P.state==='ready')t=`Du bist schon auf dem Niveau „Sehr gut vorbereitet“ (${pct(P.R.total)} %). Jetzt heißt es halten: täglich ein Smart-Training und einmal pro Woche eine Probeprüfung.`;
+  else if(P.state==='young')t=`Prüfungsreife jetzt ${pct(P.R.total)} %. Eine Prognose ist möglich, sobald du seit einer Woche genug Antworten hast.`;
+  else if(P.state==='flat')t=`Prüfungsreife jetzt ${pct(P.R.total)} %. In den letzten ${P.back} Tagen ist sie kaum gestiegen. Mehr Wiederholung der Fehler und täglich lernen bringt den Aufwärtstrend zurück.`;
+  else{const ok=dl==null?null:P.days<=dl;
+    t=`Prüfungsreife jetzt ${pct(P.R.total)} %. Bei deinem Tempo der letzten ${P.back} Tage erreichst du ${pct(READY)} % voraussichtlich am <b>${fmtD(P.date)}</b> (in ${P.days} Tagen).`+(dl==null?' Trag unter Einstellungen deinen Testtag ein, dann vergleiche ich mit dem Termin.':ok?` Das ist vor deinem Testtag (in ${dl} Tagen). Bleib in diesem Tempo.`:` Dein Testtag ist schon in ${dl} Tagen. Erhöhe dein Pensum: täglich zwei Smart-Trainings und den schwächsten Bereich extra.`);}
+  const wc=P.state==='data'?null:weakestCat();
+  return `<div class="card" id="progcard"><b>Prognose bis zum Testtag</b><p class="sub" style="margin:4px 0 0">${t}</p>
+  ${P.state==='data'?'':`<p class="sub small" style="margin:6px 0 0"><b>Plan für heute:</b> 1 Smart-Training und 10 Aufgaben in deinem schwächsten Bereich (${esc(AREA[P.R.weakest.id].t)}).</p>`}
+  <div class="row" style="margin:8px 0 0">${wc?`<button class="btn alt sm" data-act="weakgo" data-v="${wc}">Schwächsten Bereich üben</button>`:''}</div>
+  <p class="sub small" style="margin:6px 0 0">Schätzung aus deinem bisherigen Fortschritt, keine Garantie.</p></div>`;
+}
+
+/* ---------- 6. Wochenbericht: Hinweis am Sonntag und Montag ---------- */
+function wbKey(){const d=new Date();d.setHours(0,0,0,0);const g=d.getDay();d.setDate(d.getDate()-((g+6)%7));return dkey(d);}
+function sundayCard(){const g=new Date().getDay();if(!(g===0||g===1)||ST.wbSeen===wbKey()||(ST.log||[]).length<10)return '';
+  return `<button class="card pop" data-go="woche" style="display:block;width:100%;text-align:left;border:0;cursor:pointer"><b>Dein Wochenbericht ist da</b><p class="sub" style="margin:4px 0 0">Was besser wurde, was schwächer wurde und dein Fokus für die nächste Woche. Antippen zum Öffnen.</p></button>`;}
+const _viewWoche6=viewWoche;viewWoche=function(){const h=_viewWoche6();if(ST.wbSeen!==wbKey()){ST.wbSeen=wbKey();save();}return h;};
+
+/* ---------- 5. Serien und Abzeichen ---------- */
+function bestStreak(){const ks=Object.keys(ST.days||{}).filter(k=>ST.days[k]>=STREAK_MIN).sort();let best=0,cur=0,prev=null;
+  for(const k of ks){const d=dOnly(k);cur=prev&&Math.round((d-prev)/DAY)===1?cur+1:1;best=Math.max(best,cur);prev=d;}return best;}
+const BADGES=[
+ ['a100','100 Antworten','Fleißig angefangen',S7=>S7.n>=100],
+ ['a500','500 Antworten','Dranbleiben zahlt sich aus',S7=>S7.n>=500],
+ ['a1000','1000 Antworten','Profi-Pensum',S7=>S7.n>=1000],
+ ['s3','3 Tage am Stück','Je 10 Aufgaben pro Tag',S7=>S7.st>=3],
+ ['s7','7 Tage am Stück','Eine ganze Woche',S7=>S7.st>=7],
+ ['s14','14 Tage am Stück','Zwei Wochen ohne Pause',S7=>S7.st>=14],
+ ['s30','30 Tage am Stück','Ein ganzer Monat',S7=>S7.st>=30],
+ ['cats','Alle Themen geübt','Jedes Thema mindestens einmal',S7=>S7.cats],
+ ['b50','50 Fragen in Box 5','Sitzt sicher',S7=>S7.b5>=50],
+ ['b250','250 Fragen in Box 5','Großes Fundament',S7=>S7.b5>=250],
+ ['bfull','Box 5 voll','Alle Kartei-Fragen in Box 5',S7=>S7.b5>0&&S7.b5===S7.kt],
+ ['kz100','100 Kennzeichen richtig','Kennzeichen-Aufgaben',S7=>S7.kz>=100],
+ ['ex1','Erste Probeprüfung','Unter echten Bedingungen',S7=>S7.ex>=1],
+ ['expass','Probeprüfung bestanden','Nach der Messlatte der App',S7=>S7.pass],
+ ['ex85','Probeprüfung ab 85 %','Spitzenergebnis',S7=>S7.exBest>=85],
+ ['bl10','Blitzrunde: 10 richtig','Schnell und genau',S7=>S7.bl>=10],
+ ['turbo','Fehler-Turbo geschafft','Alle Fehler zweimal richtig',S7=>S7.turbo>=1],
+ ['r80','Prüfungsreife 80 %','Sehr gut vorbereitet',S7=>S7.ready>=READY]
+];
+function badgeStats(){const L=ST.log||[],ids=karteiIds(),R=readiness(),ex=ST.exams||[];
+  return {n:L.length,st:Math.max(bestStreak(),streak()),cats:CATS.every(c=>L.some(e=>e.c===c.id)),b5:ids.filter(id=>boxOf(id)===5).length,kt:ids.length,
+    kz:L.filter(e=>e.o&&typeof e.i==='string'&&/^t:.*kz/.test(e.i)).length,ex:ex.length,pass:ex.some(e=>e.pass),exBest:ex.reduce((a,e)=>Math.max(a,e.total),0),
+    bl:(ST.blitz||[]).reduce((a,b)=>Math.max(a,b.ok||0),0),turbo:ST.turboDone||0,ready:R.enough?R.total:0};}
+function checkBadges(){ST.bdg=ST.bdg||{};const s=badgeStats(),neu=[];for(const b of BADGES)if(!ST.bdg[b[0]]&&b[3](s)){ST.bdg[b[0]]=Date.now();neu.push(b);}if(neu.length)save();return neu;}
+V7.abzeichen=function(){checkBadges();const s=badgeStats(),got=BADGES.filter(b=>ST.bdg[b[0]]).length;
+  return `<button class="back" data-go="more">Mehr</button><h1 class="lt">Serien und Abzeichen</h1>
+  <div class="card"><b>Aktuelle Serie: ${streak()} ${streak()===1?'Tag':'Tage'}</b><p class="sub" style="margin:4px 0 0">Längste Serie: ${s.st} Tage. Ein Lerntag zählt ab ${STREAK_MIN} Aufgaben. ${got} von ${BADGES.length} Abzeichen.</p></div>
+  <div class="badges">${BADGES.map(b=>{const t=ST.bdg[b[0]];return `<div class="bdg ${t?'on':''}"><span class="bi" aria-hidden="true">${t?'★':'☆'}</span><b>${esc(b[1])}</b><small>${esc(t?'Seit '+new Date(t).toLocaleDateString('de-AT'):b[2])}</small></div>`;}).join('')}</div>`;
+};
+const _finish6=finishSession;
+finishSession=function(timeout){
+  const turbo=S&&S.turbo&&!timeout&&turboOpen().length===0;
+  _finish6(timeout);
+  if(turbo&&S){ST.turboDone=(ST.turboDone||0)+1;save();}
+  const neu=checkBadges();if(S&&neu.length){S.newBadges=neu;render();}
+};
+
+/* ---------- 2. Fehler-Turbo ---------- */
+function turboIds(){const t0=Date.now()-7*DAY,s=new Set();for(const e of ST.log||[])if(e.t>=t0&&!e.o&&QBYID[e.i])s.add(e.i);return [...s];}
+function turboOpen(){if(!S||!S.turbo)return [];const seq={};for(const r of S.res){const id=r.q&&r.q.id;if(!id)continue;(seq[id]=seq[id]||[]).push(r.ok);}
+  return S.turboIds.filter(id=>{const a=seq[id]||[];return !(a.length>=2&&a[a.length-1]&&a[a.length-2]);});}
+function startTurbo(){const ids=shuffle(turboIds());if(!ids.length){notice='In den letzten 7 Tagen hattest du keine Fehler bei den Fragen aus dem Fragenkatalog. Stark!';render();return;}
+  const f=()=>startSession('wrong','Fehler-Turbo',ids.map(stepFromId),{again:f,turbo:1,turboIds:ids.slice()});f();}
+const _advance6=advance;
+advance=function(){
+  if(S&&S.turbo&&!S.done&&S.i+1>=S.steps.length&&(S.tround||1)<12){
+    const queued=new Set(S.steps.slice(S.i+1).map(s=>s.q&&s.q.id)),open=turboOpen().filter(id=>!queued.has(id));
+    if(open.length){S.tround=(S.tround||1)+1;S.label='Fehler-Turbo · Runde '+S.tround;for(const id of shuffle(open))S.steps.push(stepFromId(id));}
+  }
+  _advance6();
+};
+
+/* ---------- 3. Regel-Karten ---------- */
+const RK_AREAS=['logik','sprache'];
+function rkAdd(q){
+  const a=CAT[q.cat]&&CAT[q.cat].area;if(!RK_AREAS.includes(a))return;
+  const tag=tagOf(q),k=q.id||('t:'+(q.tid||tag));ST.rk=ST.rk||{};const old=ST.rk[k];
+  const right=q.oh?'':(q.t==='mc'?q.o[q.ci]:String(showAns(q)));
+  ST.rk[k]={c:q.cat,tg:tag,q:String(q.q||'').slice(0,400),a:right,e:q.e||'',tip:TIDTIP[tag]||'',n:(old?old.n:0)+1,t:Date.now()};
+}
+const _submit6=submit;
+submit=function(given,conf){const n0=S?S.res.length:0;_submit6(given,conf);if(S&&S.res.length>n0){const r=S.res[S.res.length-1];if(r&&!r.ok&&r.q){rkAdd(r.q);save();}}};
+let rkF='all',rkPos=0,rkShow=false;
+function rkList(){const R=ST.rk||{};return Object.keys(R).filter(k=>rkF==='all'||CAT[R[k].c].area===rkF).sort((a,b)=>R[b].n-R[a].n||R[b].t-R[a].t);}
+V7.regeln=function(){
+  const L=rkList(),R=ST.rk||{};
+  let h=`<button class="back" data-go="more">Mehr</button><h1 class="lt">Regel-Karten</h1><p class="sub">Nach jedem Fehler in Logik oder Rechtschreibung/Grammatik landet die passende Regel hier. Blättere sie vor dem Test durch. Was sitzt, nimmst du heraus.</p>
+  <div class="seg" role="group" aria-label="Auswahl">${[['all','Alle'],['logik','Logik'],['sprache','Sprache']].map(([k,l])=>`<button data-act="rkf" data-v="${k}" class="${rkF===k?'on':''}">${l}</button>`).join('')}</div>`;
+  if(!L.length)return h+`<div class="card"><p class="sub">Noch keine Regel-Karten${rkF==='all'?'':' in diesem Bereich'}. Sie entstehen automatisch, wenn du dort etwas falsch beantwortest.</p></div>`;
+  const k=L[rkPos%L.length],x=R[k];
+  h+=`<div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><span class="chip">${esc(x.tg)}</span><span class="sub small">${rkPos%L.length+1} / ${L.length}${x.n>1?' · '+x.n+'× falsch':''}</span></div>
+  <div class="q" style="margin-top:8px">${esc(x.q)}</div>`;
+  if(rkShow)h+=`${x.a?`<p class="small" style="color:var(--ok);font-weight:700;margin:6px 0">Richtig: ${esc(x.a)}</p>`:''}${x.tip?`<div class="exp"><b>Regel:</b> ${esc(x.tip)}</div>`:''}${x.e?`<div class="exp" style="margin-top:8px">${esc(x.e)}</div>`:''}
+  <div class="row"><button class="btn alt" data-act="rkdel" data-k="${esc(k)}">Sitzt, herausnehmen</button><button class="btn" data-act="rknext">Nächste Karte</button></div>`;
+  else h+=`<div class="row"><button class="btn" data-act="rkshow">Regel zeigen</button><button class="btn alt" data-act="rknext">Weiter</button></div>`;
+  return h+`</div>`;
+};
+
+/* ---------- 4. Probeprüfung: Vergleich mit dem Üben ---------- */
+function practiceAcc(a){const t0=Date.now()-30*DAY,cats=AREA[a].cats,L=(ST.log||[]).filter(e=>e.t>=t0&&cats.includes(e.c)&&!['exam','retry','blitz'].includes(e.m));return {n:L.length,acc:accOf(L)};}
+function examCompare(){
+  const E=S.exam;if(!E)return '';let worst=null;
+  const rows=AREAS.map(a=>{const x=E.areas[a.id];if(!x||!x.n)return '';const p=practiceAcc(a.id),ep=E.apct[a.id];
+    if(p.n<10)return `<div class="cmprow"><span>${esc(a.t)}</span><small>Prüfung <b>${ep} %</b> · Üben: noch zu wenig Daten</small></div>`;
+    const pp=pct(p.acc),d=ep-pp;if(!worst||d<worst.d)worst={d,t:a.t};
+    return `<div class="cmprow"><span>${esc(a.t)}</span><small>Prüfung <b>${ep} %</b> · Üben ${pp} % · <b style="color:var(--${d<-10?'bad':d<0?'warn':'ok'})">${d>0?'+':''}${d} Punkte</b></small></div>`;}).join('');
+  return `<div class="card"><b>Prüfung im Vergleich zum Üben</b><p class="sub small" style="margin:4px 0 6px">Prüfungsbedingungen wie im Test: feste Zeit, keine Rückmeldung, keine Tipps, kein Zurück. Daneben deine Trefferquote beim Üben (letzte 30 Tage).</p>
+  <div class="cmp">${rows}</div>
+  ${worst&&worst.d<-5?`<p class="sub" style="margin:8px 0 0">Unter Prüfungsbedingungen verlierst du am meisten bei <b>${esc(worst.t)}</b> (${worst.d} Prozentpunkte). Übe diesen Bereich öfter mit Zeitdruck, zum Beispiel in der Blitzrunde.</p>`:worst?`<p class="sub" style="margin:8px 0 0">Unter Prüfungsbedingungen bist du so gut wie beim Üben. Sehr gut.</p>`:''}</div>`;
+}
+const _viewResult6=viewResult;
+viewResult=function(){let h=_viewResult6();
+  if(S.newBadges&&S.newBadges.length)h=S.newBadges.map(b=>`<div class="toast pop">★ Neues Abzeichen: ${esc(b[1])}</div>`).join('')+h;
+  if(S.mode==='exam'){const i=h.indexOf('<div class="row">');const c=examCompare();h=i>=0?h.slice(0,i)+c+h.slice(i):h+c;}
+  return h;};
+const _viewExam6=viewExam;
+viewExam=function(){const h=_viewExam6();return h.replace('</h1>','</h1><p class="sub small" style="margin:4px 0 8px"><b>Echte Bedingungen:</b> feste Zeit, keine Rückmeldung, keine Tipps, kein Zurückblättern. Danach siehst du den Vergleich mit deinen Übungswerten.</p>');};
+
+/* ---------- 8. Fortschritt an ein anderes Gerät schicken ---------- */
+function canShareFile(){try{return !!(navigator.canShare&&navigator.canShare({files:[new File(['x'],'t.json',{type:'application/json'})]}));}catch(e){return false;}}
+async function shareBackup(){
+  const name='aufnahmetest-sicherung-'+dkey()+'.json';
+  try{await navigator.share({files:[new File([JSON.stringify(ST)],name,{type:'application/json'})],title:'Aufnahmetest-Sicherung'});backupMsg='Fertig: Sicherung geteilt. Auf dem anderen Gerät hier unter „Sicherung laden“ die Datei wählen.';}
+  catch(e){backupMsg=e&&e.name==='AbortError'?'Abgebrochen.':'Teilen ist hier nicht möglich. Nutze „Text erzeugen“ und „Kopieren“.';}
+  render();
+}
+const _viewBackup6=viewBackup;
+viewBackup=function(){const h=_viewBackup6();if(!canShareFile())return h;
+  return h.replace('<div class="card"><b>Sicherung erstellen</b>','<div class="card"><b>An anderes Gerät schicken</b><p class="sub small" style="margin:4px 0 8px">Per AirDrop, Nachrichten oder Mail. Auf dem anderen Gerät die Datei unter „Sicherung laden“ wählen.</p><div class="row" style="margin:0"><button class="btn sm" data-act="bkshare">Teilen …</button></div></div><div class="card"><b>Sicherung erstellen</b>');};
+
+/* ---------- 9. Grafiken vergrößern ---------- */
+function zoomTargets(){const app=document.getElementById('app');if(!app||!S||S.done)return null;
+  const fig=app.querySelector('.fig svg')?app.querySelector('.fig'):null;const opts=[...app.querySelectorAll('.opt')].filter(o=>o.querySelector('svg'));
+  return fig||opts.length?{fig,opts}:null;}
+function zoomOpen(){const z=zoomTargets();if(!z)return;
+  const box=document.createElement('div');box.id='zoom';box.setAttribute('role','dialog');box.setAttribute('aria-label','Grafik vergrößert');
+  let h=`<div class="zhead"><b>Grafik vergrößert</b><button class="btn sm" id="zclose">Schließen</button></div>`;
+  if(z.fig)h+=`<div class="zfig">${z.fig.innerHTML}</div>`;
+  z.opts.forEach((o,i)=>{h+=`<div class="zfig"><span class="chip">${String.fromCharCode(65+i)}</span>${o.querySelector('svg').outerHTML}</div>`;});
+  box.innerHTML=h+`<p class="sub small" style="text-align:center">Zum Antworten schließen und die Antwort in der Aufgabe antippen.</p>`;
+  box.querySelectorAll('svg').forEach(s=>{const w=parseFloat(s.getAttribute('width')),hh=parseFloat(s.getAttribute('height'));if(!s.getAttribute('viewBox')&&w&&hh)s.setAttribute('viewBox','0 0 '+w+' '+hh);s.removeAttribute('width');s.removeAttribute('height');s.style.width='100%';s.style.height='auto';s.style.maxHeight='70vh';});
+  document.body.appendChild(box);document.body.style.overflow='hidden';document.getElementById('zclose').focus();
+}
+function zoomClose(){const b=document.getElementById('zoom');if(b)b.remove();document.body.style.overflow='';}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')zoomClose();});
+const _render6=render;
+render=function(){zoomClose();_render6();
+  if(S&&!S.done&&S.rv==null&&!S.confirmExit&&zoomTargets()){const app=document.getElementById('app'),anchor=app.querySelector('.fig')||app.querySelector('.opt');
+    if(anchor&&!app.querySelector('[data-act="zoom"]')){const b=document.createElement('button');b.className='btn alt sm zbtn';b.dataset.act='zoom';b.textContent='Grafik vergrößern';anchor.parentNode.insertBefore(b,anchor);}}
+};
+
+/* ---------- 10. Aufnahmegespräch mit Stimme ---------- */
+const ivKI={};
+function ivCur(){const L=ivOrder&&ivOrder.l;if(!L||!L.length)return null;return L[ivPos%L.length];}
+function ivPrompt(i){const x=IV[i],a=(ST.ivA||{})[i]||'';return `Du bist Mitglied einer Aufnahmekommission der Polizei Österreich. Gib mir ehrliches, freundliches Feedback zu meiner Antwort im Aufnahmegespräch. Höchstens 130 Wörter, Deutsch: 1. was gut ist, 2. was fehlt oder besser wäre (Kommunikation, Auftreten, Bezug zum Polizeiberuf, konkrete Beispiele), 3. ein verbesserter Beispielsatz. Erfinde keine Fakten über das Verfahren.\nFrage: ${x[1]}\nMeine Antwort: ${a||'(noch keine Antwort geschrieben)'}`;}
+const _viewInterview6=viewInterview;
+viewInterview=function(){let h=_viewInterview6();const i=ivCur();if(i==null)return h;
+  const a=(ST.ivA||{})[i]||'',k=ivKI[i];
+  const card=`<div class="card" id="ivvoice"><b>Laut üben</b><p class="sub small" style="margin:4px 0 8px">Lass dir die Frage vorlesen und antworte laut. Zum Mitschreiben tippe ins Feld und nutze das Mikrofon auf der iPhone-Tastatur (Diktat).</p>
+  <div class="row" style="margin:0 0 8px"><button class="btn alt sm" data-act="ivspeak">Frage vorlesen</button></div>
+  <textarea class="bk" id="ivans" rows="5" aria-label="Deine Antwort" placeholder="Deine Antwort (tippen oder diktieren)" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false">${esc(a)}</textarea>
+  <p class="sub small" style="margin:4px 0 0">${a.trim()?a.trim().split(/\s+/).length+' Wörter. Gut sind meist 60 bis 150 Wörter mit einem konkreten Beispiel.':'Wird automatisch gespeichert.'}</p>
+  ${KI?`<div class="row"><button class="btn sm" data-act="ivfb">Feedback von der KI</button></div>${k?`<div class="kibox" role="status"><b>KI-Feedback</b><div id="ivkiout">${esc(k.text||(k.err?'':'Denkt nach …'))}</div>${k.err?`<p class="sub small">${esc(k.err)}</p>`:''}</div>`:''}`:''}
+  <div class="kiext"><p class="sub small" style="margin:10px 0 6px">${KI?'Zweite Meinung':'Feedback von einer KI'} (braucht Internet):</p><div class="row"><button class="btn alt sm" data-act="ivext" data-v="chatgpt">Feedback mit ChatGPT</button><button class="btn alt sm" data-act="ivext" data-v="claude">Feedback mit Claude</button></div>${ivMsg?`<p class="sub small" role="status"><b>${esc(ivMsg)}</b></p>`:''}</div></div>`;
+  const j=h.lastIndexOf('<p class="note">');return j>=0?h.slice(0,j)+card+h.slice(j):h+card;
+};
+let ivMsg='';
+async function ivFeedback(){const i=ivCur();if(i==null||!KI)return;const k=ivKI[i]={text:'',err:''};render();
+  try{const r=await KI(ivPrompt(i),{onText:({text})=>{k.text=text;const el=document.getElementById('ivkiout');if(el)el.textContent=text;}});k.text=r&&r.text||k.text;}
+  catch(e){const c=e&&e.code;k.err=c==='bad_key'?AI_BADKEY:c==='offline'?AI_OFF:c==='rate_limited'?'Gerade zu viele Anfragen. Bitte später noch einmal.':'Die KI-Hilfe ist gerade nicht erreichbar.';}
+  if(view==='interview'&&!S)render();}
+document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='ivans'){const i=ivCur();if(i==null)return;ST.ivA=ST.ivA||{};ST.ivA[i]=ev.target.value;save();}});
+
+/* ---------- 11. Meine Termine (Fristen) ---------- */
+const DL_F=[['bew','Bewerbung abgeschickt'],['t1','Testtag 1 (Computertest)'],['sich','Sicherheitserklärung hochladen bis'],['t2','Testtag 2 (Ärztliche Untersuchung, Gespräch)'],['gab','Beginn Grundausbildung']];
+function dlGet(k){return k==='t1'?(ST.tdate||''):((ST.dl||{})[k]||'');}
+function dlItems(){const it=[];
+  for(const [k,l] of DL_F){const d=dOnly(dlGet(k));if(d&&k!=='bew')it.push({d,t:l});}
+  const t2=dlGet('t2'),t1=dlGet('t1'),gab=dlGet('gab');
+  if(t2){const d=addMonths(t2,-3);it.push({d,t:'Ab hier Laborbefunde und Lungenröntgen machen lassen (am Testtag 2 höchstens 3 Monate alt)'});}
+  if(t1)it.push({d:addMonths(t1,12),t:'Testergebnisse gelten bis (12 Monate ab Testtag 1)'});
+  if(gab)it.push({d:dOnly(gab),t:'Führerschein B muss bis hier vorliegen'});
+  return it.sort((a,b)=>a.d-b.d);}
+function dlCard(){const it=dlItems();
+  return `<div class="card" id="dlcard"><b>Meine Termine und Fristen</b><p class="sub small" style="margin:4px 0 6px">Trag die Termine aus deiner Einladung bzw. E-Mail ein. Die App rechnet die Fristen daraus aus.</p>
+  ${DL_F.map(([k,l])=>`<label class="sub small" for="dl_${k}" style="display:block;margin:8px 0 2px">${esc(l)}</label><input class="date" type="date" id="dl_${k}" data-dl="${k}" value="${esc(dlGet(k))}">`).join('')}
+  ${it.length?`<div class="cmp" style="margin-top:10px">${it.map(x=>{const n=daysTo(x.d);return `<div class="cmprow"><span><b>${x.d.toLocaleDateString('de-AT')}</b> · ${n>0?'in '+n+' Tagen':n===0?'heute':'vorbei'}</span><small>${esc(x.t)}</small></div>`;}).join('')}</div>`:''}</div>`;}
+const _viewAblauf6=viewAblauf;
+viewAblauf=function(){return _viewAblauf6().replace('<h1 class="lt">Ablauf und Checkliste</h1>','<h1 class="lt">Ablauf und Checkliste</h1>'+dlCard());};
+document.addEventListener('change',ev=>{const t=ev.target;if(!t||!t.dataset||!t.dataset.dl)return;const k=t.dataset.dl;
+  if(k==='t1')ST.tdate=t.value||'';else{ST.dl=ST.dl||{};ST.dl[k]=t.value||'';}save();render();});
+function nextDeadline(){const it=dlItems().filter(x=>daysTo(x.d)>=0);return it[0]||null;}
+
+/* ---------- 12. Fitness für Testtag 2 und Ausbildung ---------- */
+function mmss(s){const m=/^(\d{1,2}):([0-5]\d)$/.exec(String(s||'').trim());return m?(+m[1])*60+(+m[2]):null;}
+V7.sport=function(){const sp=ST.sp||{},pu=+sp.pu||0,run=mmss(sp.run);
+  const lvl=(v,g,l,lower)=>v==null||v===0?'':(lower?(v<=l?'Leistungsstufe erreicht':v<=g?'Grundstufe erreicht':'noch unter der Grundstufe'):(v>=l?'Leistungsstufe erreicht':v>=g?'Grundstufe erreicht':'noch unter der Grundstufe'));
+  return `<button class="back" data-go="more">Mehr</button><h1 class="lt">Fitness</h1>
+  <div class="card"><b>Was offiziell gilt (Stand November 2026)</b><ul class="sub" style="margin:6px 0 0;padding-left:18px">
+  <li>Im Aufnahmeverfahren gibt es <b>keinen eigenen Sporttest</b>. Die Belastbarkeit wird am Testtag 2 bei der ärztlichen Untersuchung mit einer <b>Fahrradergometrie</b> geprüft.</li>
+  <li>In der Grundausbildung folgt ein <b>Fitness-Check</b>. Männer 18–29: <b>15 Liegestütze</b> (Grundstufe), 21 (Leistungsstufe), dazu eine Ausdauerdisziplin nach Wahl: <b>3.000 m Lauf in 15:15 min</b> (Grundstufe), 13:45 min (Leistungsstufe), oder 20 km Radfahren oder 300 m Schwimmen.</li>
+  <li>Ein Schwimmabzeichen brauchst du nicht, aber Schwimmen können musst du. Das wird in der Ausbildung geprüft.</li></ul>
+  <p class="sub small" style="margin:6px 0 0">Quelle: polizeikarriere.gv.at (Bewerbung, FAQ, Karriere). Werte für Frauen und andere Altersgruppen sowie Zeiten für Rad und Schwimmen stehen dort.</p></div>
+  <div class="card"><b>Meine Werte</b>
+  <label class="sub small" for="sppu" style="display:block;margin:8px 0 2px">Liegestütze am Stück (sauber)</label><input class="date" id="sppu" data-sp="pu" type="number" inputmode="numeric" min="0" max="200" value="${pu||''}">
+  ${pu?`<p class="sub small" style="margin:4px 0 0">${lvl(pu,15,21)}</p>`:''}
+  <label class="sub small" for="sprun" style="display:block;margin:8px 0 2px">3.000 m Zeit (mm:ss)</label><input class="date" id="sprun" data-sp="run" type="text" inputmode="numeric" placeholder="z. B. 14:30" autocomplete="off" autocorrect="off" spellcheck="false" value="${esc(sp.run||'')}">
+  ${run!=null?`<p class="sub small" style="margin:4px 0 0">${lvl(run,15*60+15,13*60+45,true)}</p>`:sp.run?'<p class="sub small" style="margin:4px 0 0">Bitte als Minuten:Sekunden eingeben, z. B. 14:30.</p>':''}</div>
+  <div class="card"><b>8-Wochen-Plan (3 Ausdauer- und 3 Kraft-Einheiten pro Woche)</b>
+  <table class="t tl" style="margin-top:6px"><tr><td class="n">Woche 1–2</td><td>3× 25–30 min locker laufen oder Rad fahren (du kannst dabei noch sprechen). Liegestütze jeden 2. Tag: 3 Sätze mit je 60–70 % deines Maximums.</td></tr>
+  <tr><td class="n">Woche 3–5</td><td>1× Intervalle: 6× 400 m zügig, je 2 min gehen. 1× 35–45 min locker. 1× 2–3 km im geplanten 3.000-m-Tempo. Liegestütze: 4 Sätze, pro Woche 1–2 Wiederholungen mehr.</td></tr>
+  <tr><td class="n">Woche 6–8</td><td>Wie Woche 3–5, dazu alle 2 Wochen ein 3.000-m-Test und ein Liegestütz-Test. Werte oben eintragen.</td></tr>
+  <tr><td class="n">Vor Testtag 2</td><td>Letzte 2 Tage nur locker, ausgeschlafen kommen. Für die Ergometrie hilft regelmäßiges Radfahren.</td></tr></table>
+  <p class="sub small" style="margin:6px 0 0">Allgemeiner Trainingsvorschlag, kein ärztlicher Rat. Bei Schmerzen oder Beschwerden pausieren und ärztlich abklären lassen.</p></div>`;
+};
+document.addEventListener('change',ev=>{const t=ev.target;if(!t||!t.dataset||!t.dataset.sp)return;ST.sp=ST.sp||{};ST.sp[t.dataset.sp]=t.value.trim();save();render();});
+
+/* ---------- Einbindung: Startseite, Üben, Mehr ---------- */
+const _viewHome6=viewHome;
+viewHome=function(){const h=_viewHome6(),i=h.indexOf('<div class="lw">');const nd=nextDeadline();
+  const extra=sundayCard()+progCard()+(nd?`<button class="card" data-go="ablauf" style="display:block;width:100%;text-align:left;border:0;cursor:pointer"><b>Nächste Frist: ${nd.d.toLocaleDateString('de-AT')}</b><p class="sub" style="margin:4px 0 0">${esc(nd.t)} · ${daysTo(nd.d)===0?'heute':'in '+daysTo(nd.d)+' Tagen'}</p></button>`:'');
+  return i>=0?h.slice(0,i)+extra+h.slice(i):h+extra;};
+const _viewLearn6=viewLearn;
+viewLearn=function(){const h=_viewLearn6(),n=turboIds().length,rk=Object.keys(ST.rk||{}).length;
+  const add=bigCard('data-act="turbo"','Fehler-Turbo',n?`${n} Fehler der letzten 7 Tage, bis jede Frage zweimal richtig ist`:'Keine Fehler in den letzten 7 Tagen','g3')+bigCard('data-go="regeln"','Regel-Karten',rk?rk+' Regeln aus deinen Fehlern':'Entstehen aus deinen Fehlern','g4');
+  const k=h.indexOf('<div class="grid2">');return k>=0?h.slice(0,k)+add+h.slice(k):h+add;};
+const _viewMore6=viewMore;
+viewMore=function(){let h=_viewMore6();
+  h=h.replace('</div><div class="sec">Fragen</div>',li('data-go="abzeichen"',IC.chk,'Serien und Abzeichen',Object.keys(ST.bdg||{}).length+' von '+BADGES.length+' · Serie '+streak()+' Tage','','c3')+li('data-go="regeln"',IC.save,'Regel-Karten',Object.keys(ST.rk||{}).length+' Regeln aus deinen Fehlern','','c2')+'</div><div class="sec">Fragen</div>');
+  h=h.replace('</div><div class="sec">Einstellungen</div>',li('data-go="sport"',IC.bolt,'Fitness','Ergometrie, Fitness-Check, 8-Wochen-Plan','','c9')+'</div><div class="sec">Einstellungen</div>');
+  return h;};
+Object.assign(VT,{abzeichen:'Abzeichen',regeln:'Regel-Karten',sport:'Fitness'});
+
+/* ---------- Aktionen ---------- */
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-act],#zclose');if(!b)return;if(b.id==='zclose'){zoomClose();return;}const a=b.dataset.act;
+  if(a==='weakgo')startPractice(b.dataset.v);
+  else if(a==='turbo')startTurbo();
+  else if(a==='rkf'){rkF=b.dataset.v;rkPos=0;rkShow=false;render();}
+  else if(a==='rkshow'){rkShow=true;render();}
+  else if(a==='rknext'){rkPos++;rkShow=false;render();window.scrollTo(0,0);}
+  else if(a==='rkdel'){if(ST.rk){delete ST.rk[b.dataset.k];save();}rkShow=false;render();window.scrollTo(0,0);}
+  else if(a==='bkshare')shareBackup();
+  else if(a==='zoom')zoomOpen();
+  else if(a==='ivspeak'){const i=ivCur();if(i!=null&&!speakList([IV[i][1]])){ivMsg='Vorlesen ist auf diesem Gerät nicht verfügbar.';render();}}
+  else if(a==='ivfb')ivFeedback();
+  else if(a==='ivext'){const i=ivCur();if(i==null)return;ivMsg=extOpen(b.dataset.v,ivPrompt(i))?'':AI_OFF;if(ivMsg)render();}
+  else if(a==='ivshow'||a==='ivr'||a==='ivf'){ttsStop();ivMsg='';}
+});
+
+load();if(ST.set&&ST.set.tips==null)ST.set.tips=1;applyTheme();checkBadges();render();
 
 </script>
 <div id="upd" class="upd" role="status" hidden><span>Neue Version verfügbar</span><button class="btn sm" id="updbtn">Aktualisieren</button></div>
 <style>.upd{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);color:var(--ink);border-radius:14px;padding:10px 12px 10px 16px;box-shadow:0 6px 24px rgba(0,0,0,.18);font-weight:600;max-width:600px;margin:0 auto}.upd[hidden]{display:none}</style>
 <script>
-/* Website-Fassung: offline per Service Worker, Hinweis bei neuer Version (Version e08da40495c0) */
+/* Website-Fassung: offline per Service Worker, Hinweis bei neuer Version (Version 1e5f0d54a411) */
 (function(){
   if(!('serviceWorker' in navigator))return;
   if(!(location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))return;

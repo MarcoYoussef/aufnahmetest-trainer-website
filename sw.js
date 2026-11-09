@@ -1,5 +1,5 @@
 /* Service Worker: arbeitet zuerst aus dem Speicher (offline), meldet neue Versionen */
-const V='aufnahmetest-e08da40495c0';
+const V='aufnahmetest-1e5f0d54a411';
 const FILES=['./','index.html','manifest.webmanifest','icon-180.png','icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(V).then(c=>c.addAll(FILES)));});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==V).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
