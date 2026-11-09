@@ -224,6 +224,8 @@ table.t th,table.t td{padding-left:3px;padding-right:3px}
 .seg{flex-wrap:wrap}
 .seg button{flex:1 1 auto;min-width:fit-content;white-space:nowrap;line-height:1.15}
 
+/* ===== Version 6 ===== */
+.kiext .row{margin:6px 0}.kiext .row .btn{flex:1 1 100%;white-space:normal}#aicard label{display:block;margin:8px 0 2px}#aicard select,#aicard input{width:100%;box-sizing:border-box;min-height:44px}
 /* ===== Version 5 ===== */
 .t td.n{white-space:nowrap}
 .kzt{font:inherit;font-family:ui-monospace,Menlo,monospace;cursor:pointer;background:var(--card2);color:var(--ink);min-height:48px}
@@ -2206,7 +2208,7 @@ async function kiAsk(k){
   const ctx=st.ctx&&st.ctx.type==='text'?'\nLesetext: '+st.ctx.text:'';
   const prompt=`Du bist ein geduldiger Lerncoach für den Aufnahmetest der Polizei Österreich (Computertest). Erkläre in einfachem Deutsch (österreichische Standardsprache), höchstens 110 Wörter, ohne Überschriften: 1. warum die richtige Antwort stimmt, 2. welcher Denkfehler hinter der gegebenen Antwort stecken könnte (falls sie falsch ist), 3. ein kurzer Merksatz. Erfinde keine Fakten; wenn du dir unsicher bist, sag das.${ctx}\nAufgabe: ${q.q}${opts}\nGegebene Antwort: ${mine}\nRichtige Antwort: ${right}\nErklärung der App: ${q.e}`;
   try{const r=await KI(prompt,{onText:({text})=>{x.text=text;const el=document.getElementById('kiout');if(el)el.textContent=text;}});x.text=r&&r.text||x.text;}
-  catch(e){const cd=e&&e.code;if(cd==='not_granted'){KI=null;x.err='Die KI-Hilfe ist hier nicht freigegeben.';}else if(cd==='rate_limited')x.err='Gerade zu viele Anfragen. Bitte in ein paar Minuten noch einmal.';else x.err='Die KI-Hilfe ist gerade nicht erreichbar.';}
+  catch(e){const cd=e&&e.code;if(cd==='not_granted'){KI=null;x.err='Die KI-Hilfe ist hier nicht freigegeben.';}else if(cd==='bad_key')x.err=AI_BADKEY;else if(cd==='offline')x.err=AI_OFF;else if(cd==='rate_limited')x.err='Gerade zu viele Anfragen. Bitte in ein paar Minuten noch einmal.';else x.err='Die KI-Hilfe ist gerade nicht erreichbar.';}
   if(S&&!S.done)render();
 }
 let kiCoach={text:'',err:'',busy:false};
@@ -2216,7 +2218,7 @@ async function kiCoachAsk(){
   const data=`Bereiche (Schätzwert 0–100, Anzahl Aufgaben): ${R.ar.map(a=>AREA[a.id].t+' '+pct(a.score)+' ('+a.n+')').join('; ')}. Schwache Unterthemen: ${wt.map(x=>x.g+' '+x.w+'/'+x.n+' falsch').join('; ')||'keine'}. Fehlerarten: ${Object.entries(ec).map(([k,v])=>ERRT[k].t+' '+v).join('; ')||'keine'}. Muster: ${rh.pats.map(p=>p.t).join('; ')||'keine'}. Tage bis Testtag 1: ${daysLeft()==null?'unbekannt':daysLeft()}.`;
   const prompt=`Du bist Lerncoach für den Aufnahmetest der Polizei Österreich (Computertest: logisches Denken, räumliches Vorstellen, Konzentration, Merkfähigkeit, Textverständnis, Rechtschreibung und Grammatik). Erstelle aus diesen Lerndaten einen konkreten Plan für die nächsten 7 Tage in einfachem Deutsch, höchstens 160 Wörter, als kurze Liste (Tag: Aufgabe, Dauer). Nenne die zwei wichtigsten Schwächen zuerst und einen Tipp gegen die häufigste Fehlerart. Erfinde keine Fakten über den Test. Daten: ${data}`;
   try{const r=await KI(prompt,{onText:({text})=>{kiCoach.text=text;const el=document.getElementById('kicout');if(el)el.textContent=text;}});kiCoach.text=r&&r.text||kiCoach.text;}
-  catch(e){kiCoach.err=e&&e.code==='rate_limited'?'Gerade zu viele Anfragen. Bitte später noch einmal.':'Die KI-Hilfe ist gerade nicht erreichbar.';if(e&&e.code==='not_granted')KI=null;}
+  catch(e){kiCoach.err=e&&e.code==='bad_key'?AI_BADKEY:e&&e.code==='offline'?AI_OFF:e&&e.code==='rate_limited'?'Gerade zu viele Anfragen. Bitte später noch einmal.':'Die KI-Hilfe ist gerade nicht erreichbar.';if(e&&e.code==='not_granted')KI=null;}
   kiCoach.busy=false;render();
 }
 
@@ -2506,7 +2508,7 @@ document.addEventListener('click',ev=>{
   else if(a==='rf'){ST.rf=b.dataset.v;save();render();}
   else if(a==='repgo'){const f=()=>startSession('rep','Wiederholung',stepsRep(),{again:f});f();}
   else if(a==='thgo'){const c=ST.tc,g=ST.tg;if(!c)return;if(g){const f=()=>startSession('focus',g,stepsFocus(c,g),{again:f});f();}else startPractice(c);}
-  else if(a==='kbox'){const n=+b.dataset.v;const f=()=>startSession('rep','Lernkartei Box '+n,stepsBox(n),{again:f});f();}
+  else if(a==='kbox'){const n=+b.dataset.v;const f=()=>startSession('rep','Lernkartei Box '+n,stepsBox(n),{again:f,boxN:n});f();}
   else if(a==='kf'){ST.kf[b.dataset.k]=ST.kf[b.dataset.k]?0:1;save();render();}
   else if(a==='xm'){ST.xm[b.dataset.k]=ST.xm[b.dataset.k]?0:1;save();render();}
   else if(a==='xgo'){const sel=AREAS.filter(x=>ST.xm[x.id]).map(x=>x.id);const only=sel.length?new Set(sel):null;startSession('exam',sel.length&&sel.length<AREAS.length?'Prüfung: '+sel.length+(sel.length===1?' Bereich':' Bereiche'):'Probeprüfung',stepsExam(only));}
@@ -2803,13 +2805,149 @@ document.addEventListener('click',ev=>{
   else if(a==='repfehler'){const f=()=>startSession('rep','Wiederholungsfehler',stepsRepFehler(),{again:f});f();}
 });
 
+
+
+/* ===== Version 6: Lernkartei ohne Abbruch, KI-Hilfe auch ohne Claude ===== */
+
+/* ---------- Lernkartei: alle Fragen einer Box in einem Durchgang ---------- */
+function stepsBox(n){
+  const now=Date.now();const ids=karteiIds().filter(id=>boxOf(id)===n);
+  const sc=id=>{const b=ST.box[id];return (b&&b[1]<=now?2:0)+Math.random();};
+  return ids.sort((a,b)=>sc(b)-sc(a)).map(stepFromId);
+}
+/* Am Ende einer Box-Runde: falsch beantwortete Fragen, die noch in der Box liegen, kommen sofort noch einmal.
+   Die Sitzung endet erst, wenn die Box durch ist (oder du selbst aufhörst). */
+function boxRefill(){
+  if(!S||!S.boxN||S.done)return;
+  const last={};for(const r of S.res)if(r.q&&r.q.id)last[r.q.id]=r.ok;
+  const queued=new Set(S.steps.slice(S.i+1).map(s=>s.q&&s.q.id));
+  const more=karteiIds().filter(id=>boxOf(id)===S.boxN&&!queued.has(id)&&(last[id]===false||!(id in last)));
+  if(!more.length)return;
+  S.round=(S.round||1)+1;S.label='Lernkartei Box '+S.boxN+' · Runde '+S.round;
+  for(const id of shuffle(more))S.steps.push(stepFromId(id));
+}
+const _advance5=advance;
+advance=function(){if(S&&S.boxN&&!S.done&&S.i+1>=S.steps.length)boxRefill();_advance5();};
+
+/* ---------- KI-Hilfe ohne Claude ---------- */
+const AI_BADKEY='Der KI-Schlüssel wurde abgelehnt. Prüfe ihn unter Mehr → Einstellungen → KI-Hilfe.';
+const AI_OFF='Keine Internetverbindung. Die KI-Hilfe braucht Internet, alles andere läuft offline.';
+const AI_PROV={
+  gemini:{n:'Google Gemini',d:'kostenloser Schlüssel',m:'gemini-flash-latest',u:'https://aistudio.google.com/apikey'},
+  claude:{n:'Anthropic Claude',d:'kostenpflichtig',m:'claude-haiku-5-5',u:'https://console.anthropic.com/settings/keys'},
+  openai:{n:'OpenAI ChatGPT',d:'kostenpflichtig',m:'gpt-5-mini',u:'https://platform.openai.com/api-keys'}
+};
+const AI_KEY='aufnahmetest_ki';
+function aiGet(){try{const x=JSON.parse(localStorage.getItem(AI_KEY)||'null');return x&&x.k&&AI_PROV[x.p]?x:null;}catch(e){return null;}}
+function aiSet(x){try{if(x)localStorage.setItem(AI_KEY,JSON.stringify(x));else localStorage.removeItem(AI_KEY);}catch(e){}}
+function aiErr(code){const e=new Error(code);e.code=code;return e;}
+async function aiCall(prompt){
+  const c=aiGet();if(!c)throw aiErr('not_granted');
+  if(typeof navigator!=='undefined'&&navigator.onLine===false)throw aiErr('offline');
+  const m=(c.m||'').trim()||AI_PROV[c.p].m;let url,init;
+  if(c.p==='gemini'){
+    url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(m)+':generateContent';
+    init={method:'POST',headers:{'content-type':'application/json','x-goog-api-key':c.k},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}]})};
+  }else if(c.p==='claude'){
+    url='https://api.anthropic.com/v1/messages';
+    init={method:'POST',headers:{'content-type':'application/json','x-api-key':c.k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:m,max_tokens:700,messages:[{role:'user',content:prompt}]})};
+  }else{
+    url='https://api.openai.com/v1/chat/completions';
+    init={method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+c.k},body:JSON.stringify({model:m,messages:[{role:'user',content:prompt}]})};
+  }
+  let r;try{r=await fetch(url,init);}catch(e){throw aiErr(navigator.onLine===false?'offline':'unavailable');}
+  if(r.status===401||r.status===403)throw aiErr('bad_key');
+  if(r.status===429)throw aiErr('rate_limited');
+  let j=null;try{j=await r.json();}catch(e){}
+  if(!r.ok){const e=aiErr(r.status===400&&/key/i.test(JSON.stringify(j||''))?'bad_key':'unavailable');e.detail=j&&j.error&&(j.error.message||j.error.type)||('HTTP '+r.status);throw e;}
+  let t='';
+  if(c.p==='gemini')t=((j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[]).map(x=>x.text||'').join('');
+  else if(c.p==='claude')t=(j.content||[]).filter(x=>x.type==='text').map(x=>x.text).join('');
+  else t=j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content||'';
+  if(!t.trim())throw aiErr('unavailable');
+  return t.trim();
+}
+const aiKI=async(prompt,o)=>{const t=await aiCall(prompt);if(o&&o.onText)o.onText({text:t});return {text:t};};
+let KI_CLAUDE=!!KI;
+function aiApply(){if(KI&&KI!==aiKI)return;KI=aiGet()?aiKI:null;}
+aiApply();
+setTimeout(()=>{if(KI&&KI!==aiKI)KI_CLAUDE=true;},1500);
+
+/* Aufgabe als Text für eine andere KI */
+function kiTask(){
+  const st=S.steps[S.i],q=st.q,c=S.cur;
+  const opts=q.t==='mc'?'\nAntwortmöglichkeiten: '+q.o.map((o,i)=>String.fromCharCode(65+i)+') '+o).join(' | '):'';
+  const mine=!c?'–':q.t==='mc'?(c.given==null?'keine':q.o[c.given]):Array.isArray(c.given)?(c.given.map(i=>q.mk.list[i]).join(', ')||'keines markiert'):String(c.given);
+  const right=q.t==='mc'?q.o[q.ci]:showAns(q);
+  let ctx=st.ctx&&st.ctx.type==='text'?st.ctx.text:'';if(ctx.length>2500)ctx=ctx.slice(0,2500)+' …';
+  return {ctx:ctx?'\nLesetext: '+ctx:'',q:q.q,opts,mine,right,e:q.e||''};
+}
+function kiExtPrompt(kind){
+  const t=kiTask();
+  if(kind==='check')return `Prüfe unabhängig eine Übungsaufgabe für den Aufnahmetest der Polizei Österreich. Löse die Aufgabe zuerst selbst, ohne dich von der angegebenen Lösung leiten zu lassen. Vergleiche dann. Antworte auf Deutsch mit „Lösung stimmt“ oder „Fehler gefunden“ und einer kurzen Begründung.${t.ctx}\nAufgabe: ${t.q}${t.opts}\nAngegebene richtige Antwort: ${t.right}\nErklärung der App: ${t.e}`;
+  return `Du bist ein geduldiger Lerncoach für den Aufnahmetest der Polizei Österreich. Erkläre in einfachem Deutsch, höchstens 120 Wörter: 1. warum die richtige Antwort stimmt, 2. welcher Denkfehler hinter meiner Antwort stecken könnte (falls sie falsch ist), 3. ein kurzer Merksatz. Erfinde keine Fakten.${t.ctx}\nAufgabe: ${t.q}${t.opts}\nMeine Antwort: ${t.mine}\nRichtige Antwort: ${t.right}\nErklärung der App: ${t.e}`;
+}
+function kiOpen(app,kind){
+  if(navigator.onLine===false){if(S)S.kiMsg=AI_OFF;else notice=AI_OFF;render();return;}
+  if(S)S.kiMsg='';
+  const p=kiExtPrompt(kind);
+  const url=app==='claude'?'https://claude.ai/new?q='+encodeURIComponent(p):'https://chatgpt.com/?q='+encodeURIComponent(p);
+  try{if(navigator.clipboard)navigator.clipboard.writeText(p).catch(()=>{});}catch(e){}
+  window.open(url,'_blank','noopener');
+}
+const _kiBlock3=kiBlock;
+kiBlock=function(q,c){
+  if(q.oh||S._rv)return '';
+  const own=KI?_kiBlock3(q,c):'';
+  const ext=`<div class="kiext"><p class="sub small" style="margin:10px 0 6px">${KI?'Zweite Meinung':'KI-Hilfe'} (braucht Internet, öffnet die App bzw. Website):</p><div class="row">
+    <button class="btn alt sm" data-act="kiext" data-v="chatgpt|explain">Erklären mit ChatGPT</button>
+    <button class="btn alt sm" data-act="kiext" data-v="claude|explain">Erklären mit Claude</button>
+    <button class="btn alt sm" data-act="kiext" data-v="chatgpt|check">Lösung von KI prüfen lassen</button></div>
+    ${S.kiMsg?`<p class="sub small" role="status" style="margin:6px 0 0"><b>${esc(S.kiMsg)}</b></p>`:''}${KI?'':'<p class="sub small" style="margin:6px 0 0">Direkt hier in der App antwortet die KI, wenn du unter Mehr → Einstellungen → KI-Hilfe einen eigenen Schlüssel einträgst (Google Gemini gibt es kostenlos).</p>'}</div>`;
+  return own+ext;
+};
+
+/* ---------- Einstellungen: KI-Schlüssel ---------- */
+let aiMsg='';
+function aiCard(){
+  const c=aiGet()||{p:'gemini',k:'',m:''};
+  const opt=Object.entries(AI_PROV).map(([k,v])=>`<option value="${k}" ${c.p===k?'selected':''}>${v.n} (${v.d})</option>`).join('');
+  return `<div class="card" id="aicard"><b>KI-Hilfe (eigener Schlüssel)</b>
+  <p class="sub small" style="margin:4px 0 8px">Damit erklärt die KI Aufgaben direkt in der App und der KI-Lerncoach funktioniert. Der Schlüssel bleibt nur auf diesem Gerät und wird nur an den gewählten Anbieter geschickt. Er ist nicht in der Sicherung enthalten. Ohne Schlüssel kannst du jede Aufgabe mit einem Tipp an ChatGPT oder Claude schicken.</p>
+  <label class="sub small" for="aip">Anbieter</label><select id="aip" class="date">${opt}</select>
+  <label class="sub small" for="aik">Schlüssel</label><input id="aik" class="date" type="password" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="${c.k?'gespeichert – zum Ändern neu eingeben':'API-Schlüssel einfügen'}">
+  <label class="sub small" for="aim">Modell (leer = Standard)</label><input id="aim" class="date" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="${esc(c.m||'')}" placeholder="${esc(AI_PROV[c.p].m)}">
+  <div class="row" style="margin-top:8px"><button class="btn sm" data-act="aisave">Speichern und testen</button>${aiGet()?'<button class="btn alt sm" data-act="aidel">Schlüssel löschen</button>':''}</div>
+  <p class="sub small" style="margin:6px 0 0">Schlüssel holen: ${Object.values(AI_PROV).map(v=>`<a href="${v.u}" target="_blank" rel="noopener">${v.n}</a>`).join(' · ')}</p>
+  ${aiMsg?`<p class="sub small" role="status" style="margin:6px 0 0"><b>${esc(aiMsg)}</b></p>`:''}
+  ${KI_CLAUDE&&KI!==aiKI?'<p class="sub small" style="margin:6px 0 0">Hier in Claude ist die KI-Hilfe schon eingebaut.</p>':''}</div>`;
+}
+const _viewSettings0=viewSettings;
+viewSettings=function(){return _viewSettings0()+aiCard();};
+async function aiSave(){
+  const p=document.getElementById('aip').value,kin=document.getElementById('aik').value.trim(),m=document.getElementById('aim').value.trim();
+  const old=aiGet();const k=kin||(old&&old.p===p?old.k:'');
+  if(!k){aiMsg='Bitte einen Schlüssel eintragen.';render();return;}
+  aiSet({p,k,m});aiApply();aiMsg='Wird getestet …';render();
+  try{await aiCall('Antworte nur mit dem Wort OK.');aiMsg='Gespeichert. Die KI-Hilfe funktioniert.';}
+  catch(e){aiMsg=e.code==='bad_key'?'Gespeichert, aber der Anbieter lehnt den Schlüssel ab.':e.code==='offline'?'Gespeichert. Test erst mit Internet möglich.':e.code==='rate_limited'?'Gespeichert. Gerade zu viele Anfragen, später noch einmal testen.':'Gespeichert, aber der Test schlug fehl'+(e.detail?': '+e.detail:'.');}
+  if(view==='settings'&&!S)render();
+}
+document.addEventListener('change',ev=>{if(ev.target&&ev.target.id==='aip'){const m=document.getElementById('aim');if(m)m.placeholder=AI_PROV[ev.target.value].m;}});
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
+  if(a==='kiext'){const [app,kind]=b.dataset.v.split('|');kiOpen(app,kind);}
+  else if(a==='aisave')aiSave();
+  else if(a==='aidel'){aiSet(null);aiApply();aiMsg='Schlüssel gelöscht.';render();}
+});
+
 load();if(ST.set&&ST.set.tips==null)ST.set.tips=1;applyTheme();render();
 
 </script>
 <div id="upd" class="upd" role="status" hidden><span>Neue Version verfügbar</span><button class="btn sm" id="updbtn">Aktualisieren</button></div>
 <style>.upd{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);color:var(--ink);border-radius:14px;padding:10px 12px 10px 16px;box-shadow:0 6px 24px rgba(0,0,0,.18);font-weight:600;max-width:600px;margin:0 auto}.upd[hidden]{display:none}</style>
 <script>
-/* Website-Fassung: offline per Service Worker, Hinweis bei neuer Version (Version fabaa00619d1) */
+/* Website-Fassung: offline per Service Worker, Hinweis bei neuer Version (Version e08da40495c0) */
 (function(){
   if(!('serviceWorker' in navigator))return;
   if(!(location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))return;
