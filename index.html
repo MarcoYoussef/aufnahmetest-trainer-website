@@ -977,7 +977,7 @@ function genKZmem(lv){
   const qs=[
     MC('me',lv,'Welches Kennzeichen hast du dir gemerkt?',T,[...wr],`Gemerkt werden sollte ${T}. Die anderen weichen in Bezirk, Ziffern oder Buchstaben ab.`),
     NUM('me',lv,`Wie oft steht das gemerkte Kennzeichen genau so in dieser Liste?\n\n${rows.join('\n')}`,ans,`Das gemerkte Kennzeichen ${T} steht ${ans}-mal in der Liste. Alle anderen weichen in mindestens einem Zeichen ab.`,{mono:true,mk:{k:'kz',list:L,t:T}})];
-  return{memo:`<div style="grid-column:1/-1;text-align:center"><p class="sub small" style="margin:0 0 10px">Merke dir dieses Kennzeichen. Auf der nächsten Seite suchst du es in einer Liste.</p>${plateHtml(T)}</div>`,secs,qs,tid:'kzmem'};
+  return{memo:`<div style="grid-column:1/-1;text-align:center"><p class="sub small" style="margin:0 0 10px">Merke dir dieses Kennzeichen. Auf der nächsten Seite wählst du das richtige Kennzeichen aus.</p>${plateHtml(T)}</div>`,secs,qs,tid:'kzmem'};
 }
 
 /* ===== Markierung nach der Antwort (reines JS, kein DOM). Farbe nie allein: immer Symbol oder Text dazu. ===== */
@@ -1094,8 +1094,9 @@ function freshState(){return {v:2,lvl:{},man:{},stat:{},box:{},bm:[],days:{},goa
 function load(){
   try{const x=localStorage.getItem(KEY);if(x){const p=JSON.parse(x);if(p&&p.v===2&&p.stat&&p.box)ST=Object.assign(freshState(),p);}}catch(e){storageOK=false;}
 }
-function save(){try{ST.at=Date.now();localStorage.setItem(KEY,JSON.stringify(ST));storageOK=true;}catch(e){storageOK=false;}}
+function save(){try{ST.at=Date.now();localStorage.setItem(KEY,JSON.stringify(ST));storageOK=true;}catch(e){storageOK=false;}try{mirrorSoon();}catch(e){}}
 function importState(txt){
+  try{snapNow('vor-Laden');}catch(e){}
   let p;try{p=JSON.parse(txt.trim());}catch(e){return 'Der Text ist keine gültige Sicherung.';}
   if(!p||p.v!==2||typeof p.stat!=='object'||typeof p.box!=='object'||!Array.isArray(p.bm))return 'Das ist keine Sicherung dieser App (Version 2).';
   ST=Object.assign(freshState(),p);save();return '';
@@ -1169,7 +1170,7 @@ function recordAnswer(q,ok,mode,x){
   x=x||{};const before=todayN();
   ST.log=ST.log||[];
   ST.log.push({t:Date.now(),c:q.cat,g:tagOf(q),l:q.lv||1,o:ok?1:0,m:x.retry?'retry':mode,d:x.ms||0,f:(x.conf==null?-1:x.conf),i:q.id||(q.tid?'t:'+q.tid:''),p:x.pos||0,h:x.help||0,x:x.err||''});
-  if(ST.log.length>4000)ST.log.splice(0,ST.log.length-4000);
+  if(ST.log.length>12000)ST.log.splice(0,ST.log.length-12000);
   if(x.retry){const k=dkey();ST.days[k]=(ST.days[k]||0)+1;save();return null;}
   /* Mit Hilfe gelöst: zählt nicht für die Prüfungsreife und kommt früher wieder */
   if(x.help){const k=dkey();ST.days[k]=(ST.days[k]||0)+1;ST.helped=(ST.helped||0)+(ok?1:0);
@@ -1812,7 +1813,7 @@ function viewBackup(){
   <p class="sub small" style="margin:6px 0 0">Kopiere den Text und speichere ihn in einer Notiz oder Nachricht an dich.</p>${canSave()?`<div class="row" style="margin:8px 0 0"><button class="btn alt sm" data-act="bkfile">Als Datei sichern</button></div>`:''}</div>
   <div class="card"><b>Sicherung laden</b><label class="btn alt sm" style="margin-top:8px;display:inline-flex;align-items:center;cursor:pointer">Sicherungsdatei wählen<input type="file" id="bkfilein" accept=".json,application/json,text/plain" hidden></label><textarea class="bk" id="bkin" style="margin-top:8px" placeholder="Sicherungstext hier einfügen" aria-label="Sicherung einfügen" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
   <div class="row" style="margin:8px 0 0">${confirmImport?`<button class="btn red sm" data-act="doimport">Ja, aktuellen Stand ersetzen</button><button class="btn alt sm" data-act="cancelimport">Abbrechen</button>`:`<button class="btn sm" data-act="askimport">Laden</button>`}</div>
-  ${backupMsg?`<p class="verdict ${backupMsg.startsWith('Fertig')?'ok':'bad'}">${esc(backupMsg)}</p>`:''}</div>`;
+  ${backupMsg?`<p class="verdict ${backupMsg.startsWith('Fertig')?'ok':'bad'}">${esc(backupMsg)}</p>`:''}</div>`+snapCard();
 }
 function viewSettings(){
   return `<button class="back" data-go="more">Mehr</button><h1 class="lt">Einstellungen</h1>
@@ -1838,8 +1839,19 @@ function viewInfo(){
 }
 
 /* ---------- Sitzung ---------- */
+function withReads(steps){
+  const out=[];
+  for(let i=0;i<steps.length;i++){
+    const st=steps[i],c=st&&st.k==='q'&&st.ctx&&st.ctx.type==='text'?st.ctx:null;
+    if(c){const pv=out[out.length-1];const cont=pv&&((pv.k==='read'&&pv.title===c.title)||(pv.k==='q'&&pv.ctx&&pv.ctx.type==='text'&&pv.ctx.title===c.title));
+      if(!cont){let n=0;while(i+n<steps.length&&steps[i+n].k==='q'&&steps[i+n].ctx&&steps[i+n].ctx.type==='text'&&steps[i+n].ctx.title===c.title)n++;
+        out.push({k:'read',title:c.title,text:c.text,n,area:st.area});}}
+    out.push(st);
+  }
+  return out;
+}
 function startSession(mode,label,steps,extra){
-  stopTimers();
+  stopTimers();if(steps&&steps.length)steps=withReads(steps);
   if(!steps||!steps.length){notice='Dafür sind gerade keine Aufgaben verfügbar.';render();return;}
   S=Object.assign({mode,label,steps,i:0,res:[],cur:null,sel:null,t0:Date.now(),memoLeft:0,events:[],done:false,confirmExit:false,back:view,backArg:viewArg},extra||{});
   if(mode==='exam'||mode==='blitz'){S.endAt=S.t0+(mode==='exam'?(S.perArea?(Object.values(AREA_MIN).reduce((a,b)=>a+b,0)+10):EXAM_MIN)*60:BLITZ_SEC)*1000;timers.push(setInterval(examTick,1000));examTick();}
@@ -1966,15 +1978,15 @@ function viewStep(){
   if(S.events.length&&S.cur===null&&!exam){const e=S.events.slice(-1)[0];if(e&&!e.shown){e.shown=1;S.flash=e;}}
   if(S.flash&&!exam){const e=S.flash;S.flash=null;h+=`<div class="toast pop ${e.dir==='down'?'dn':''}">${esc(CAT[e.cat].t)}: ${e.dir==='up'?'Aufgestiegen auf Stufe '+e.lv+'. Stark!':'Zurück auf Stufe '+e.lv+'. Festigen, dann geht es wieder hinauf.'}</div>`;}
   if(st.ctx&&st.ctx.type==='text'){const dn=!!S.cur&&!exam;
-    if(dn)h+=`<details class="textp" open><summary>${esc(st.ctx.title)} · Fundstelle markiert</summary><div class="tx">${evText(st.ctx.text,q.ev)}</div></details>`;
-    else if(!st.ctx.hid)h+=`<details class="textp" open><summary>${esc(st.ctx.title)}</summary>${ttsOK()&&!exam&&ST.set&&ST.set.tts?`<button class="btn alt sm tts" data-act="tts" aria-pressed="false">Vorlesen</button>`:''}${sentHtml(st.ctx.text)}</details>`;
-    else if(S.mode!=='exam')h+=`<details class="textp"><summary>Text „${esc(st.ctx.title)}“ einblenden</summary><div class="tx">${esc(st.ctx.text)}</div></details>`;
+    if(dn)h+=`<details class="textp"><summary>Fundstelle im Text „${esc(st.ctx.title)}“ ansehen</summary><div class="tx">${evText(st.ctx.text,q.ev)}</div></details>`;
+    else if(S.mode!=='exam')h+=`<p class="sub small" style="margin:0 0 8px">Frage zum Text „${esc(st.ctx.title)}“. Der Text stand auf der Seite davor.</p>`;
     else h+=`<p class="sub small" style="margin:0 0 8px">Fragen zum Text „${esc(st.ctx.title)}“. Antworte aus dem Gedächtnis.</p>`;}
   const fr=S.cur&&!exam&&ST.set&&ST.set.frame?(S.cur.ok?' frame-ok':' frame-bad'):'';
   h+=`<div class="card${fr}"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>${lvChip(L)}${ptsChip(q)}</span>${st.re?'<span class="chip re">Noch einmal</span>':(st.ctx&&st.ctx.type==='memo'?'<span class="sub small">aus dem Gedächtnis</span>':'')}</div>`;
   if(q.fig)h+=`<div class="fig">${q.fig}</div>`;
   h+=qHtml(q);
   if(!exam&&!S.cur&&canReadQ(q))h+=`<button class="btn alt sm tts" data-act="ttsq" aria-pressed="false">Frage vorlesen</button>`;
+  if(!exam&&!S.cur&&!S._rv)h+=noteSlot(q);
   const done=!!S.cur&&!exam;
   if(!done&&helpOK())h+=tipsHtml(q,st);
   if(q.t==='mc'){
@@ -2112,7 +2124,7 @@ document.addEventListener('click',ev=>{
   else if(a==='fs'){ST.fs=+b.dataset.v;save();applyFont();render();}
   else if(a==='askreset'){confirmReset=true;render();}
   else if(a==='cancelreset'){confirmReset=false;render();}
-  else if(a==='doreset'){const th=ST.theme;ST=freshState();ST.theme=th;save();confirmReset=false;view='home';render();}
+  else if(a==='doreset'){try{snapNow('vor-Zuruecksetzen');}catch(e){}const th=ST.theme;ST=freshState();ST.theme=th;save();confirmReset=false;view='home';render();}
   else if(a==='mkbackup'){const t=document.getElementById('bkout');t.value=JSON.stringify(ST);t.focus();t.select();}
   else if(a==='copybackup'){const t=document.getElementById('bkout');if(!t.value)t.value=JSON.stringify(ST);t.focus();t.select();try{document.execCommand('copy');backupMsg='';}catch(e){}}
   else if(a==='askimport'){const t=document.getElementById('bkin');if(!t.value.trim()){backupMsg='Füge zuerst den Sicherungstext ein.';render();return;}const err=(()=>{try{const p=JSON.parse(t.value.trim());return p&&p.v===2?'':'x';}catch(e){return 'x';}})();if(err){backupMsg='Das ist keine gültige Sicherung dieser App.';confirmImport=false;render();return;}window._imp=t.value;backupMsg='';confirmImport=true;render();}
@@ -2491,7 +2503,7 @@ function viewFragenstand(){
 
 /* ---------- Navigation und Rendern ---------- */
 function renderNav(){
-  const tab=S?null:({home:'home',learn:'learn',cat:'home',exam:'learn',rep:'learn',themen:'learn',marked:'learn',kartei:'learn',karten:'learn',more:'more',stats:'more',backup:'more',settings:'more',info:'more',interview:'home',ablauf:'home',analyse:'more',rhythmus:'more',woche:'more',methoden:'more',notizen:'more',suche:'more',fragenstand:'more',diktat:'learn',profil:'more'})[view];
+  const tab=S?null:({home:'home',learn:'learn',cat:'home',exam:'learn',rep:'learn',themen:'learn',marked:'learn',kartei:'learn',karten:'learn',more:'more',stats:'more',backup:'more',settings:'more',info:'more',interview:'home',ablauf:'home',analyse:'more',rhythmus:'more',woche:'more',methoden:'more',lex:'learn',lexp:'learn',notizen:'more',suche:'more',fragenstand:'more',diktat:'learn',profil:'more'})[view];
   if(S){$nav.style.display='none';document.querySelector('.wrap').classList.add('nonav');return;}
   $nav.style.display='flex';document.querySelector('.wrap').classList.remove('nonav');
   const NI={home:'<svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>',learn:'<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 01-14.3 4.9M4 12A8 8 0 0118.3 7.1"/><path d="M18.5 3v4.3h-4.3M5.5 21v-4.3h4.3"/></svg>',more:ICON.more};
@@ -2584,7 +2596,7 @@ function voiceScore(v){const n=(v.name||'').toLowerCase();let s=0;
   if(/premium/.test(n))s+=60;if(/enhanced|erweitert|verbessert|neural|natural|online/.test(n))s+=45;if(/siri/.test(n))s+=35;if(/google/.test(n))s+=15;
   if(/de[-_]at/i.test(v.lang))s+=8;else if(/de[-_]de/i.test(v.lang))s+=5;if(/compact|eloquence|grandma|grandpa|rocko|shelley|flo|reed|sandy/.test(n))s-=30;return s;}
 function bestVoice(){if(ST.voice){const v=VOICES.find(x=>x.voiceURI===ST.voice);if(v)return v;}return VOICES.slice().sort((a,b)=>voiceScore(b)-voiceScore(a))[0]||null;}
-const ttsRate=()=>ST.rate||.95;
+const ttsRate=()=>ST.rate||.92;
 let TT={on:false,btn:null,els:[]};
 function splitSent(t){return (String(t).match(/[^.!?…]+(?:[.!?…]+["“”»«)]*|$)\s*/g)||[t]).filter(x=>x.trim());}
 function sentHtml(t,id){return `<div class="tx readtx" id="${id||'ttstext'}">${splitSent(t).map((s,i)=>`<span class="ts" data-si="${i}">${esc(s)}</span>`).join('')}</div>`;}
@@ -2665,7 +2677,7 @@ function viewDiktat(){
   let h=`<button class="back x" data-act="dkleave">Beenden</button><div class="prog"><span>Diktat</span><span class="bar"><i style="width:${Math.round(100*DK.i/DK.list.length)}%"></i></span><span>${DK.i+1} / ${DK.list.length}</span></div><div class="card">`;
   h+=`<div class="row" style="margin:0 0 10px"><button class="btn sm" data-act="dksay">${DK.heard?'Nochmal anhören':'Anhören'}</button><button class="btn alt sm" data-act="dkslow">Langsam</button></div>`;
   if(DK.shown&&!c)h+=`<div class="readtx" style="font-size:20px">${esc(s)}</div>`;
-  if(!c)h+=`<textarea class="bk dkin" id="dkin" rows="3" placeholder="Satz hier eintippen" aria-label="Diktat eingeben" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-gramm="false"></textarea><div class="row"><button class="btn" data-act="dkcheck">Prüfen</button></div>`;
+  if(!c)h+=`<textarea class="bk dkin" id="dkin" rows="3" placeholder="Satz hier eintippen" aria-label="Diktat eingeben" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-gramm="false"></textarea><div class="row"><button class="btn" data-act="dkcheck">Prüfen</button><button class="btn alt" data-act="dknext">Überspringen</button></div>`;
   else{
     const d=c.d;
     h+=`<div class="verdict ${d.err?'bad':'ok'}" role="status">${d.err?'✗ '+d.err+(d.err===1?' Fehler':' Fehler'):'✓ Fehlerfrei!'}</div>`;
@@ -2718,32 +2730,47 @@ function kzToggle(k){
 }
 
 /* ---------- Vor und zurück: wischen, Pfeiltasten, Knöpfe ---------- */
-const navOK=()=>!!S&&!S.done&&!S.confirmExit&&!fastMode();
+const navOK=()=>!!S&&!S.done&&!S.confirmExit;
 function qSteps(){return S.steps.map((s,i)=>s.k==='q'&&S.hist&&S.hist[i]?i:-1).filter(i=>i>=0);}
 function prevQ(from){const L=qSteps().filter(i=>i<from);return L.length?L[L.length-1]:null;}
 function nextQ(from){const L=qSteps().filter(i=>i>from&&i<S.i);return L.length?L[0]:null;}
 function slide(dir){const a=document.getElementById('app');if(!a||!(ST.set&&ST.set.anim))return;a.classList.remove('swl','swr');void a.offsetWidth;a.classList.add(dir<0?'swl':'swr');}
 function navBack(){if(!navOK())return;const base=S.rv!=null?S.rv:S.i;const j=prevQ(base);if(j==null)return;ttsStop();S.rv=j;slide(1);render();window.scrollTo(0,0);}
+function skipItem(){
+  ttsStop();const st=S.steps[S.i];if(!st)return;
+  const a=S.i;let b=a+1;
+  if(st.k==='read'){while(b<S.steps.length&&S.steps[b].k==='q'&&S.steps[b].ctx&&S.steps[b].ctx.title===st.title)b++;}
+  const nq=S.steps.slice(a,b).filter(x=>x.k==='q').length;
+  S.skipped=(S.skipped||0)+nq;S.sel=null;S.kz=null;S.noteOpen=false;S.cur=null;
+  if(fastMode()){S.i=b-1;advance();return;}/* Prüfung: bleibt unbeantwortet und zählt als nicht gelöst */
+  const blk=S.steps.splice(a,b-a);
+  const again=blk.every(x=>x.sk);
+  if(!again&&S.steps.length>a){blk.forEach(x=>{x.sk=1;});S.steps.push(...blk);
+    S.flashMsg=nq>1?'Text übersprungen. Er kommt am Ende der Runde noch einmal. Überspringst du ihn dann wieder, entfällt er.':'Übersprungen. Die Frage kommt am Ende der Runde noch einmal. Überspringst du sie dann wieder, entfällt sie.';}
+  else S.flashMsg='Übersprungen. Das zählt nicht als Antwort.';
+  S.flashSkip=true;
+  if(S.i>=S.steps.length){if(S.res.length)finishSession(false);else leaveSession();return;}
+  enterStep();render();window.scrollTo(0,0);
+}
 function navFwd(){
   if(!navOK())return;
   if(S.rv!=null){const j=nextQ(S.rv);S.rv=j;slide(-1);render();window.scrollTo(0,0);return;}
   const st=S.steps[S.i];if(!st)return;
-  if(st.k==='memo'||st.k==='read'||st.k==='intro'){slide(-1);advance();return;}
+  if(st.k==='memo'||st.k==='intro'){slide(-1);advance();return;}
   if(S.cur){slide(-1);advance();return;}
-  /* unbeantwortet: überspringen, kommt am Ende der Runde (nur ohne Lesetext/Merkblock) */
-  if(st.k==='q'&&!st.ctx&&S.i<S.steps.length-1){S.steps.push(S.steps.splice(S.i,1)[0]);S.sel=null;S.kz=null;S.flashSkip=true;ttsStop();slide(-1);render();window.scrollTo(0,0);}
+  if(st.k==='q'||st.k==='read'){slide(-1);skipItem();}
 }
 function navRow(){
   if(!navOK())return '';
   const st=S.steps[S.i],base=S.rv!=null?S.rv:S.i,hasPrev=prevQ(base)!=null;
-  const canSkip=S.rv==null&&st&&st.k==='q'&&!S.cur&&!st.ctx&&S.i<S.steps.length-1;
+  const canSkip=S.rv==null&&st&&(st.k==='q'||st.k==='read')&&!S.cur;
   if(!hasPrev&&!canSkip&&S.rv==null)return '';
-  return `<div class="qnav"><button class="btn alt sm" data-act="navb" ${hasPrev?'':'disabled'} aria-label="Vorherige Frage">‹ Zurück</button>${S.rv!=null?`<button class="btn alt sm" data-act="rvexit">Zur aktuellen Frage</button>`:''}${canSkip?`<button class="btn alt sm" data-act="navf">Überspringen ›</button>`:''}</div>`;
+  return `<div class="qnav">${fastMode()?'':`<button class="btn alt sm" data-act="navb" ${hasPrev?'':'disabled'} aria-label="Vorherige Frage">‹ Zurück</button>`}${S.rv!=null?`<button class="btn alt sm" data-act="rvexit">Zur aktuellen Frage</button>`:''}${canSkip?`<button class="btn alt sm" data-act="navf">${st.k==='read'?'Text überspringen ›':'Überspringen ›'}</button>`:''}</div>`;
 }
 let TS=null;
-document.addEventListener('touchstart',e=>{TS=null;if(!navOK()||e.touches.length>1)return;if(e.target.closest('input,textarea,select'))return;const t=e.touches[0];TS={x:t.clientX,y:t.clientY,t:Date.now()};},{passive:true});
+document.addEventListener('touchstart',e=>{TS=null;if(!navOK()||e.touches.length>1)return;if(e.target.closest('input,textarea,select,.fig,.bk'))return;const t=e.touches[0];TS={x:t.clientX,y:t.clientY,t:Date.now()};},{passive:true});
 document.addEventListener('touchend',e=>{if(!TS)return;const t=e.changedTouches[0];const dx=t.clientX-TS.x,dy=t.clientY-TS.y,dt=Date.now()-TS.t;TS=null;
-  if(Math.abs(dx)<70||Math.abs(dy)>Math.abs(dx)*.6||dt>900)return;if(dx<0)navFwd();else navBack();},{passive:true});
+  if(Math.abs(dx)<70||Math.abs(dy)>Math.abs(dx)*.6||dt>900)return;if(dx<0)navBack();else navFwd();},{passive:true});
 document.addEventListener('keydown',e=>{if(!navOK()||e.target.closest('input,textarea,select'))return;if(e.key==='ArrowLeft'){e.preventDefault();navBack();}else if(e.key==='ArrowRight'){e.preventDefault();navFwd();}});
 
 /* Rendern mit Rückblick-Modus (eine bereits beantwortete Frage nur ansehen) */
@@ -2757,7 +2784,7 @@ function render(){
       const keep={i:S.i,cur:S.cur,hid50:S.hid50,sel:S.sel,kz:S.kz},H=S.hist[S.rv];
       S.i=S.rv;S.cur=H.cur;S.hid50=H.hid50;S.sel=null;S.kz=H.kz;S._rv=true;
       try{h=`<div class="rvbar" role="status">Rückblick: bereits beantwortete Frage</div>`+navRow()+viewStep();}finally{S._rv=false;Object.assign(S,keep);}
-    }else{S.rv=null;h=navRow()+viewStep();if(S.flashSkip){S.flashSkip=false;h=`<div class="toast pop">Übersprungen. Die Frage kommt am Ende der Runde.</div>`+h;}}
+    }else{S.rv=null;h=navRow()+viewStep();if(S.flashSkip){S.flashSkip=false;h=`<div class="toast pop">${esc(S.flashMsg||'Übersprungen.')}</div>`+h;}}
   }else{const V={home:viewHome,learn:viewLearn,cat:()=>viewCat(viewArg),exam:viewExam,more:viewMore,stats:viewStats,backup:viewBackup,settings:viewSettings,info:viewInfo,interview:viewInterview,ablauf:viewAblauf,analyse:viewAnalyse,woche:viewWoche,methoden:viewMethoden,karten:viewKarten,notizen:viewNotizen,rep:viewRep,themen:viewThemen,marked:viewMarked,kartei:viewKartei,suche:viewSuche,fragenstand:viewFragenstand,rhythmus:viewRhythmus,diktat:viewDiktat,profil:viewProfil};h=(V[view]||V7[view]||viewHome)();}
   if(notice&&!S)h=`<div class="warnbox" role="status">${esc(notice)}</div>`+h;
   $app.innerHTML=h;syncTop();
@@ -3243,13 +3270,1433 @@ document.addEventListener('click',ev=>{
   else if(a==='ivshow'||a==='ivr'||a==='ivf'){ttsStop();ivMsg='';}
 });
 
-load();if(ST.set&&ST.set.tips==null)ST.set.tips=1;applyTheme();checkBadges();render();
+/* ===================== Version 6: zweiter sicherer Speicher, Sicherungen, natürlichere Stimme ===================== */
+let SNAPS=[],SNAPCONF='',_mt=null,_idb=null,SNAP_DAY='';
+function idbDb(){
+  if(_idb)return _idb;
+  _idb=new Promise((res,rej)=>{try{const r=indexedDB.open('aufnahmetest-sicher',1);r.onupgradeneeded=()=>{r.result.createObjectStore('kv');};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);}catch(e){rej(e);}});
+  _idb.catch(()=>{_idb=null;});
+  return _idb;
+}
+function idbDo(mode,fn){return idbDb().then(db=>new Promise((res,rej)=>{const t=db.transaction('kv',mode);const rq=fn(t.objectStore('kv'));t.oncomplete=()=>res(rq&&rq.result);t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error);}));}
+const idbSet=(k,v)=>idbDo('readwrite',st=>st.put(v,k)).catch(()=>{});
+const idbGet=k=>idbDo('readonly',st=>st.get(k)).catch(()=>null);
+const idbDel=k=>idbDo('readwrite',st=>st.delete(k)).catch(()=>{});
+const idbAll=()=>idbDo('readonly',st=>st.getAllKeys()).catch(()=>[]);
+function mirrorNow(){
+  _mt=null;let json;try{json=JSON.stringify(ST);}catch(e){return;}
+  idbSet('state',{at:ST.at||Date.now(),json});
+  const d=dkey();
+  if(ST.at&&SNAP_DAY!==d){SNAP_DAY=d;idbSet('snapday',d);idbSet('snap-'+Date.now()+'-Tag',{ts:Date.now(),tag:'Tag',n:(ST.log||[]).length,json}).then(pruneSnaps);}
+}
+function mirrorSoon(){if(_mt)return;_mt=setTimeout(mirrorNow,1200);}
+function snapNow(tag){
+  let json;try{json=JSON.stringify(ST);}catch(e){return;}
+  if(!ST.at)return;
+  idbSet('snap-'+Date.now()+'-'+tag,{ts:Date.now(),tag,n:(ST.log||[]).length,json}).then(pruneSnaps);
+}
+function snapKeys(){return idbAll().then(ks=>ks.filter(k=>String(k).startsWith('snap-')).sort());}
+function pruneSnaps(){return snapKeys().then(sn=>Promise.all(sn.slice(0,Math.max(0,sn.length-20)).map(idbDel))).then(refreshSnaps);}
+function refreshSnaps(){
+  return snapKeys().then(sn=>Promise.all(sn.slice(-20).reverse().map(k=>idbGet(k).then(v=>v?{k,ts:v.ts,tag:v.tag,n:v.n}:null)))).then(a=>{SNAPS=a.filter(Boolean);if(!S&&view==='backup')render();}).catch(()=>{});
+}
+function restoreFromMirror(){
+  idbGet('snapday').then(v=>{if(v)SNAP_DAY=v;});
+  idbGet('state').then(m=>{
+    if(!m||!m.json){mirrorSoon();return;}
+    let p;try{p=JSON.parse(m.json);}catch(e){return;}
+    if(!p||p.v!==2||typeof p.stat!=='object'||typeof p.box!=='object')return;
+    if((p.at||0)>(ST.at||0)+1500&&!S){
+      snapNow('vor-Wiederherstellung');
+      ST=Object.assign(freshState(),p);
+      try{localStorage.setItem(KEY,JSON.stringify(ST));storageOK=true;}catch(e){}
+      applyTheme();notice='Dein Fortschritt wurde aus dem zweiten, sicheren Speicher wiederhergestellt.';render();
+    }
+  });
+  refreshSnaps();
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){try{mirrorNow();}catch(e){}}});
+window.addEventListener('pagehide',()=>{try{mirrorNow();}catch(e){}});
+function snapCard(){
+  const fmt=t=>new Date(t).toLocaleString('de-AT',{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'});
+  const n=(ST.log||[]).length;
+  return `<div class="card"><b>Automatische Sicherungen</b><p class="sub small" style="margin:4px 0 8px">Jede Antwort wird sofort doppelt auf diesem Gerät gespeichert (zwei getrennte Speicher). Dazu legt die App täglich eine Sicherung an und eine vor jedem Laden oder Zurücksetzen. Gespeicherte Antworten im Protokoll: <b>${n}</b>.</p>${SNAPS.length?SNAPS.map(x=>`<div class="row" style="margin:6px 0;align-items:center;justify-content:space-between"><span class="sub small">${esc(fmt(x.ts))} · ${esc(x.tag)} · ${x.n} Antworten</span><button class="btn ${SNAPCONF===x.k?'red':'alt'} sm" data-act="snaprestore" data-k="${esc(x.k)}">${SNAPCONF===x.k?'Ja, wiederherstellen':'Wiederherstellen'}</button></div>`).join(''):'<p class="sub small">Noch keine Sicherung vorhanden. Die erste entsteht automatisch.</p>'}</div>`;
+}
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-act="snaprestore"]');if(!b)return;const k=b.dataset.k;
+  if(SNAPCONF!==k){SNAPCONF=k;render();return;}
+  SNAPCONF='';
+  idbGet(k).then(v=>{let p;try{p=JSON.parse(v.json);}catch(e){backupMsg='Diese Sicherung konnte nicht gelesen werden.';render();return;}
+    if(!p||p.v!==2||!p.stat||!p.box){backupMsg='Diese Sicherung konnte nicht gelesen werden.';render();return;}
+    snapNow('vor-Wiederherstellung');ST=Object.assign(freshState(),p);save();applyTheme();backupMsg='Fertig: Sicherung wiederhergestellt.';render();});
+});
+
+/* ---------- Sprachausgabe: natürlicher (Pausen, Aussprache, beste Stimme des Geräts) ---------- */
+function voiceScore(v){const n=((v.name||'')+' '+(v.voiceURI||'')).toLowerCase();let s=0;
+  if(/premium/.test(n))s+=80;else if(/enhanced|erweitert|verbessert/.test(n))s+=55;
+  if(/neural|natural|online/.test(n))s+=50;if(/siri/.test(n))s+=40;if(/google/.test(n))s+=20;
+  if(/anna|helena|petra|markus|yannick|viktor|martin|katja|hedda|stefan|conrad|amala|florian|seraphina|vicki|steffi/.test(n))s+=6;
+  if(/de[-_]at/i.test(v.lang))s+=6;else if(/de[-_]de/i.test(v.lang))s+=4;
+  if(/compact|eloquence|grandma|grandpa|rocko|shelley|\bflo\b|reed|sandy|eddy|bubbles|bad news|good news|whisper|zarvox|trinoids|albert|organ|jester|boing|bells|cellos|superstar|wobble/.test(n))s-=60;
+  return s;}
+function voiceLevel(v){const s=v?voiceScore(v):0;return s>=75?'Premium':s>=45?'Erweitert':'Standard';}
+function bestVoice(){if(ST.voice){const v=VOICES.find(x=>x.voiceURI===ST.voice);if(v)return v;}return VOICES.slice().sort((a,b)=>voiceScore(b)-voiceScore(a))[0]||null;}
+function speechClean(t){
+  let s=String(t).replace(/[*_#`]/g,'');
+  const R=[[/\bz\.\s?B\./g,'zum Beispiel'],[/\bd\.\s?h\./g,'das heißt'],[/\bbzw\./g,'beziehungsweise'],[/\busw\./g,'und so weiter'],[/\bu\.\s?a\./g,'unter anderem'],[/\bca\./g,'circa'],[/\bggf\./g,'gegebenenfalls'],[/\bvgl\./g,'vergleiche'],[/\bz\.\s?T\./g,'zum Teil'],[/\bNr\./g,'Nummer'],[/\bDr\./g,'Doktor'],
+    [/\bStVO\b/g,'S T V O'],[/\bKFG\b/g,'K F G'],[/\bBMI\b/g,'B M I'],[/\bPkw\b/g,'P K W'],[/\bLkw\b/g,'L K W'],[/\bkm\/h\b/g,'Kilometer pro Stunde'],[/\bm\/s\b/g,'Meter pro Sekunde'],
+    [/(\d)\s?%/g,'$1 Prozent'],[/€/g,' Euro'],[/\bkg\b/g,'Kilogramm'],[/\bkm\b/g,'Kilometer'],[/−/g,'minus '],[/\s[–—]\s/g,', '],[/(\d)\.(\d{3})\b/g,'$1$2']];
+  R.forEach(([a,b])=>{s=s.replace(a,b);});
+  return s.replace(/\s+/g,' ').trim();
+}
+function speechChunks(t){
+  const out=[];
+  splitSent(t).forEach(sent=>{
+    const x=sent.trim();if(!x)return;
+    const end=x.slice(-1);const gapEnd=end==='?'?380:end==='!'?330:end==='…'?450:310;
+    if(x.length>120){
+      const bits=x.replace(/([,;:])\s+/g,'$1\u0001').split('\u0001');const groups=[];let cur='';
+      bits.forEach(b=>{if(cur&&(cur+' '+b).length>110){groups.push(cur);cur=b;}else cur=cur?cur+' '+b:b;});
+      if(cur)groups.push(cur);
+      groups.forEach((g,i)=>out.push({t:g,gap:i===groups.length-1?gapEnd:160,q:i===groups.length-1&&end==='?'}));
+    }else out.push({t:x,gap:gapEnd,q:end==='?'});
+  });
+  return out.length?out:[{t:String(t),gap:200,q:false}];
+}
+let SPK=0;
+function speakList(parts,opt){
+  opt=opt||{};if(!ttsOK()||!parts.length)return false;
+  try{
+    speechSynthesis.cancel();const v=bestVoice();TT.on=true;const my=++SPK;
+    const jobs=[];parts.forEach((p,i)=>speechChunks(speechClean(p)).forEach(c=>jobs.push(Object.assign({part:i},c))));
+    const rate=opt.rate||ttsRate();let n=0;
+    const next=()=>{
+      if(my!==SPK||!TT.on)return;
+      if(n>=jobs.length){TT.on=false;if(opt.onEnd)opt.onEnd();return;}
+      const j=jobs[n++];const u=new SpeechSynthesisUtterance(j.t);
+      u.lang=v?v.lang:'de-AT';if(v)u.voice=v;u.rate=rate*(v&&voiceLevel(v)==='Standard'?.94:1);u.pitch=j.q?1.05:1;u.volume=1;
+      u.onstart=()=>{if(my===SPK&&opt.onPart)opt.onPart(j.part);};
+      const done=()=>{if(my===SPK)setTimeout(next,j.gap);};
+      u.onend=done;u.onerror=e=>{if(e&&(e.error==='canceled'||e.error==='interrupted'))return;done();};
+      speechSynthesis.speak(u);
+    };
+    next();return true;
+  }catch(e){TT.on=false;return false;}
+}
+function ttsCard(){
+  if(!ttsOK())return `<div class="card"><b>Vorlesen</b><p class="sub small" style="margin:4px 0 0">Dieser Browser hat keine Sprachausgabe.</p></div>`;
+  const cur=bestVoice(),lvl=voiceLevel(cur);
+  const opts=VOICES.slice().sort((a,b)=>voiceScore(b)-voiceScore(a)).map(v=>`<option value="${esc(v.voiceURI)}" ${cur&&cur.voiceURI===v.voiceURI?'selected':''}>${esc(v.name)} (${esc(v.lang)}) · ${voiceLevel(v)}</option>`).join('');
+  return `<div class="card"><b>Vorlesen und Diktat</b><p class="sub small" style="margin:2px 0 8px">Die App wählt automatisch die beste deutsche Stimme deines Geräts und spricht mit natürlichen Pausen.</p>
+  ${VOICES.length?`<label class="sub small" for="voicesel">Stimme</label><select class="pick" id="voicesel" style="margin-top:4px">${opts}</select>
+  ${lvl==='Standard'?`<div class="warnbox">Deine beste Stimme ist nur „Standard“ und klingt deshalb noch nach Computer. Lade eine <b>Premium</b>- oder <b>Erweitert</b>-Stimme (Anleitung unten), das macht den größten Unterschied.</div>`:`<p class="sub small" style="margin:6px 0 0">Aktuelle Stimme: ${esc(cur.name)} (${lvl}).</p>`}`:'<p class="sub small">Stimmen werden geladen … Tippe auf „Probe hören“.</p>'}
+  <div class="sub small" style="margin:10px 0 4px">Tempo</div><div class="seg">${[[.8,'Langsam'],[.95,'Normal'],[1.1,'Schnell']].map(([k,l])=>`<button data-act="rate" data-v="${k}" class="${ttsRate()===k?'on':''}">${l}</button>`).join('')}</div>
+  <div class="row" style="margin:10px 0 0"><button class="btn alt sm" data-act="ttsprobe">Probe hören</button><button class="btn alt sm" data-act="vcmp">Stimmen vergleichen</button></div>
+  <p class="sub small" style="margin:8px 0 0"><b>So bekommst du die menschlichste Stimme am iPhone:</b> Einstellungen → Bedienungshilfen → Gesprochene Inhalte → Stimmen → Deutsch → eine Stimme mit „Premium“ (sonst „Erweitert“) laden, z. B. Anna oder Markus. Danach diese App neu öffnen und hier „Stimmen vergleichen“ tippen. Eine bessere Stimme kann die App nicht selbst herunterladen.</p></div>`;
+}
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-act="vcmp"]');if(!b||!ttsOK())return;
+  loadVoices();const L=VOICES.slice().sort((a,b)=>voiceScore(b)-voiceScore(a)).slice(0,6);if(!L.length)return;
+  try{speechSynthesis.cancel();}catch(e){}
+  L.forEach(v=>{const u=new SpeechSynthesisUtterance('Hallo, ich bin '+(v.name||'eine Stimme').replace(/\(.*?\)/g,'')+'. So klinge ich beim Vorlesen.');u.voice=v;u.lang=v.lang;u.rate=ttsRate();speechSynthesis.speak(u);});
+});
+
+/* ===================== Version 7: Wissen (Lernseiten), Aussprache ===================== */
+Object.assign(VT,{lex:'Wissen'});
+Object.assign(VT,{lex:'Nachschlagen',lexp:'Nachschlagen'});
+const LEX=[
+{g:'Deutsch: Fälle',cat:'gr',c:'c4',items:[
+{id:'fall0',t:'Die vier Fälle im Überblick',d:'Fragen, Artikel, Tabelle',b:[
+"# Die Frage verrät den Fall",
+"Stelle zum Satzglied die passende Frage. Die Frage zeigt dir den Fall.",
+"| Fall | Frage | der (m.) | die (f.) | das (n.) | die (Pl.) |",
+"| Nominativ | Wer oder was? | der Mann | die Frau | das Kind | die Kinder |",
+"| Genitiv | Wessen? | des Mannes | der Frau | des Kindes | der Kinder |",
+"| Dativ | Wem? | dem Mann | der Frau | dem Kind | den Kindern |",
+"| Akkusativ | Wen oder was? | den Mann | die Frau | das Kind | die Kinder |",
+"> Merke: Nur beim Maskulinum sehen alle vier Fälle verschieden aus. Beim Femininum und im Plural helfen die Fragen.",
+"ex: Der Polizist (Nominativ) hilft dem Mann (Dativ), schreibt den Bericht (Akkusativ) wegen des Unfalls (Genitiv).",
+"# Besonderheit: n-Deklination",
+"Einige männliche Nomen bekommen in allen Fällen außer dem Nominativ ein -n oder -en: der Polizist, den Polizisten, dem Polizisten, des Polizisten. Ebenso: der Mensch, der Herr, der Student, der Kollege, der Nachbar.",
+"# Tipp für den Test",
+"Setze zur Probe ein anderes Wort ein, bei dem man den Fall hört: statt „dem Mann“ sagst du „diesem Mann“ (Dativ) oder „diesen Mann“ (Akkusativ)."]},
+{id:'nom',t:'Nominativ (1. Fall)',d:'Wer oder was?',b:[
+"# Wann Nominativ?",
+"Der Nominativ ist der Grundfall. Er steht beim Subjekt, also bei dem, der etwas tut oder um den es geht.",
+"• Frage: **Wer oder was?**",
+"• Artikel: der Mann, die Frau, das Kind, die Kinder",
+"ex: Der Zug kommt an. (Wer oder was kommt an? Der Zug.)",
+"# Auch nach sein, werden, bleiben",
+"Nach den Verben sein, werden und bleiben steht ebenfalls der Nominativ.",
+"ex: Er ist ein guter Polizist. Sie wird Ärztin. Das bleibt ein Geheimnis.",
+"> Merke: Subjekt und Prädikatsnomen stehen im Nominativ. Das Verb richtet sich in Person und Zahl nach dem Subjekt: Die Kinder spielen, das Kind spielt."]},
+{id:'gen',t:'Genitiv (2. Fall)',d:'Wessen?',b:[
+"# Wann Genitiv?",
+"Der Genitiv zeigt Besitz oder Zugehörigkeit.",
+"• Frage: **Wessen?**",
+"• Artikel: des Mannes, der Frau, des Kindes, der Kinder",
+"ex: Das Auto des Nachbarn steht vor der Garage. (Wessen Auto? Des Nachbarn.)",
+"# Endung bei Maskulinum und Neutrum",
+"Männliche und sächliche Nomen bekommen -s oder -es: des Hauses, des Kindes, des Autos, des Mannes. Einsilbige Wörter bekommen oft -es. Feminin und Plural bleiben unverändert: der Frau, der Kinder.",
+"# Präpositionen mit Genitiv",
+"• wegen, trotz, während, statt (anstatt)",
+"• innerhalb, außerhalb, aufgrund, anlässlich",
+"ex: wegen des Regens, trotz des Verbots, während der Fahrt, statt eines Briefes",
+"> Merke: In der Alltagssprache hört man „wegen dem Wetter“. Im Test gilt der Genitiv: wegen des Wetters. Ersatz im Alltag: von + Dativ (das Auto von meinem Vater).",
+"# Verben mit Genitiv (selten)",
+"sich einer Sache bedienen, jemanden einer Tat beschuldigen, jemanden eines Verbrechens verdächtigen. Das ist die Amtssprache der Polizei: Er wird des Diebstahls verdächtigt."]},
+{id:'dat',t:'Dativ (3. Fall)',d:'Wem?',b:[
+"# Wann Dativ?",
+"Der Dativ steht beim Empfänger oder bei dem, dem etwas gegeben, gesagt oder gezeigt wird.",
+"• Frage: **Wem?**",
+"• Artikel: dem Mann, der Frau, dem Kind, den Kindern",
+"ex: Der Polizist hilft dem Mann. (Wem hilft er? Dem Mann.)",
+"# Im Plural kommt ein -n dazu",
+"den Kindern, den Autos (Ausnahme: Plural auf -s bleibt: den Autos), den Männern, den Frauen.",
+"# Präpositionen, die immer den Dativ verlangen",
+"• aus, außer, bei, mit, nach, seit, von, zu, gegenüber",
+"Eselsbrücke: „aus, außer, bei, mit, nach, seit, von, zu: dem Dativ gehört die Ruh.“",
+"ex: mit dem Auto, bei der Polizei, seit einem Jahr, nach dem Dienst, zu den Kollegen",
+"# Verben, die den Dativ verlangen",
+"helfen, danken, gehören, gefallen, folgen, antworten, glauben, begegnen, fehlen, passen, schmecken, zuhören, gratulieren",
+"ex: Ich danke dir. Das Handy gehört ihm. Der Hund folgt dem Mann.",
+"> Merke: Wechselpräpositionen (in, an, auf …) verlangen den Dativ bei der Frage WO? Mehr dazu auf der Seite „Wechselpräpositionen“."]},
+{id:'akk',t:'Akkusativ (4. Fall)',d:'Wen oder was?',b:[
+"# Wann Akkusativ?",
+"Der Akkusativ steht beim direkten Objekt, also bei dem, was von der Handlung betroffen ist.",
+"• Frage: **Wen oder was?**",
+"• Artikel: den Mann, die Frau, das Kind, die Kinder",
+"ex: Der Polizist befragt den Zeugen. (Wen befragt er? Den Zeugen.)",
+"> Merke: Nur beim Maskulinum ändert sich der Artikel gegenüber dem Nominativ: der → den. Femininum, Neutrum und Plural bleiben gleich.",
+"# Präpositionen, die immer den Akkusativ verlangen",
+"• bis, durch, für, gegen, ohne, um",
+"ex: durch den Park, für die Kollegin, gegen den Baum, ohne das Handy, um die Ecke",
+"# Typische Verben mit Akkusativ",
+"sehen, haben, brauchen, kaufen, besuchen, fragen, lieben, kennen, suchen, finden, nehmen, bekommen",
+"# Zwei Objekte",
+"Manche Verben haben Dativ und Akkusativ: Ich gebe dem Mann (Dativ) den Schlüssel (Akkusativ).",
+"> Merke: Bei Wechselpräpositionen steht der Akkusativ bei der Frage WOHIN?"]},
+{id:'wech',t:'Wechselpräpositionen',d:'Dativ oder Akkusativ? WO oder WOHIN?',b:[
+"# Die neun Wechselpräpositionen",
+"an, auf, hinter, in, neben, über, unter, vor, zwischen",
+"# So entscheidest du",
+"• **Wo?** (Ort, Ruhe, kein Ziel) → **Dativ**",
+"• **Wohin?** (Richtung, Bewegung zu einem Ziel) → **Akkusativ**",
+"| Frage | Beispiel | Fall |",
+"| Wo? | Das Buch liegt auf dem Tisch. | Dativ |",
+"| Wohin? | Ich lege das Buch auf den Tisch. | Akkusativ |",
+"| Wo? | Er steht in der Küche. | Dativ |",
+"| Wohin? | Er geht in die Küche. | Akkusativ |",
+"> Merke: liegen, stehen, sitzen, hängen (Zustand) → wo? Dativ. legen, stellen, setzen, hängen (jemanden/etwas) → wohin? Akkusativ.",
+"# Nicht verwechseln",
+"Bei Zeitangaben steht meist der Dativ: in einer Stunde, an dem Tag (am Tag), vor einem Jahr."]}
+]},
+{g:'Deutsch: Zeiten',cat:'gr',c:'c2',items:[
+{id:'zeit0',t:'Die Zeiten im Überblick',d:'Sechs Zeitformen',b:[
+"| Zeitform | Beispiel | Wann |",
+"| Präsens | ich gehe | Gegenwart, Gewohnheit, Zukunft mit Zeitangabe |",
+"| Präteritum | ich ging | Vergangenheit, schriftlich, Berichte |",
+"| Perfekt | ich bin gegangen | Vergangenheit, mündlich und im Alltag |",
+"| Plusquamperfekt | ich war gegangen | Vorvergangenheit |",
+"| Futur I | ich werde gehen | Zukunft, Vermutung |",
+"| Futur II | ich werde gegangen sein | in der Zukunft abgeschlossen |",
+"> Merke: Gesprochen verwendet man in Österreich fast immer das Perfekt (ich bin gegangen). Das Präteritum steht in Berichten und Erzählungen, zum Beispiel im Polizeibericht: Der Mann ging zur Tür und öffnete sie.",
+"# Bauplan",
+"• Präsens: Stamm + Endung",
+"• Präteritum: Stamm + te (schwache Verben) oder Vokalwechsel (starke Verben)",
+"• Perfekt: haben oder sein + Partizip II",
+"• Plusquamperfekt: hatte oder war + Partizip II",
+"• Futur I: werden + Infinitiv",
+"• Futur II: werden + Partizip II + haben oder sein"]},
+{id:'praes',t:'Präsens',d:'Gegenwart',b:[
+"# Endungen",
+"| Person | machen | arbeiten | sein | haben |",
+"| ich | mache | arbeite | bin | habe |",
+"| du | machst | arbeitest | bist | hast |",
+"| er/sie/es | macht | arbeitet | ist | hat |",
+"| wir | machen | arbeiten | sind | haben |",
+"| ihr | macht | arbeitet | seid | habt |",
+"| sie | machen | arbeiten | sind | haben |",
+"> Merke: Endet der Stamm auf d oder t, schiebt man ein e ein: du arbeitest, er arbeitet, du badest.",
+"# Vokalwechsel bei du und er/sie/es",
+"• e → i: geben (du gibst, er gibt), helfen, nehmen (du nimmst), sprechen",
+"• e → ie: sehen (du siehst), lesen (er liest)",
+"• a → ä: fahren (du fährst), laufen (er läuft), schlafen",
+"# Wann benutzt man das Präsens?",
+"• für das, was jetzt passiert: Ich lerne gerade.",
+"• für Gewohnheiten und Allgemeingültiges: Wasser kocht bei 100 Grad.",
+"• für die Zukunft mit Zeitangabe: Morgen fahre ich nach Graz."]},
+{id:'praet',t:'Präteritum',d:'Einfache Vergangenheit',b:[
+"# Schwache (regelmäßige) Verben: Stamm + te",
+"machen: ich machte, du machtest, er machte, wir machten, ihr machtet, sie machten. arbeiten: ich arbeitete (mit e, weil der Stamm auf t endet).",
+"# Starke (unregelmäßige) Verben: Vokalwechsel, keine -te-Endung",
+"| Infinitiv | Präteritum | Partizip II |",
+"| gehen | ging | gegangen |",
+"| kommen | kam | gekommen |",
+"| sehen | sah | gesehen |",
+"| geben | gab | gegeben |",
+"| nehmen | nahm | genommen |",
+"| fahren | fuhr | gefahren |",
+"| schreiben | schrieb | geschrieben |",
+"| sprechen | sprach | gesprochen |",
+"| finden | fand | gefunden |",
+"| bleiben | blieb | geblieben |",
+"| lesen | las | gelesen |",
+"| essen | aß | gegessen |",
+"| trinken | trank | getrunken |",
+"| laufen | lief | gelaufen |",
+"| helfen | half | geholfen |",
+"| sitzen | saß | gesessen |",
+"| stehen | stand | gestanden |",
+"# Mischverben: Vokalwechsel und -te",
+"bringen (brachte, gebracht), denken (dachte, gedacht), kennen (kannte, gekannt), nennen (nannte, genannt), wissen (wusste, gewusst), rennen (rannte, gerannt).",
+"# Hilfs- und Modalverben",
+"sein: ich war. haben: ich hatte. werden: ich wurde. können: konnte. müssen: musste. wollen: wollte. dürfen: durfte. sollen: sollte. mögen: mochte.",
+"> Merke: Im Präteritum ist die 1. und 3. Person gleich: ich ging, er ging. Es gibt kein -t bei ich und er bei den starken Verben."]},
+{id:'perf',t:'Perfekt',d:'Vergangenheit mit haben oder sein',b:[
+"# So wird das Perfekt gebildet",
+"Präsens von haben oder sein + Partizip II.",
+"ex: Ich habe gearbeitet. Wir sind gefahren. Sie hat das Auto gesehen.",
+"# Partizip II",
+"• regelmäßig: ge + Stamm + t (gemacht, gespielt, gearbeitet)",
+"• unregelmäßig: ge + Stamm + en (gegangen, gesehen, geschrieben)",
+"• trennbare Verben: das ge steht in der Mitte (aufgemacht, angekommen, eingestiegen)",
+"• ohne ge: Verben auf -ieren (telefoniert, studiert) und mit den Vorsilben be-, ver-, ent-, er-, zer-, ge- (besucht, verstanden, entschieden)",
+"# haben oder sein?",
+"• **sein** bei Bewegung von A nach B: gehen, fahren, kommen, laufen, fliegen, steigen",
+"• **sein** bei Zustandsänderung: aufwachen, einschlafen, werden, sterben, wachsen",
+"• **sein** außerdem bei: sein, bleiben, passieren, geschehen",
+"• **haben** bei allen anderen Verben, besonders bei Verben mit Akkusativobjekt: Ich habe einen Brief geschrieben.",
+"> Merke: In Österreich sagt man für sitzen, stehen und liegen im Perfekt „bin gesessen, bin gestanden, bin gelegen“. In Deutschland sagt man „habe gesessen“. Beides gilt regional als Standard.",
+"# Die Satzklammer",
+"Das Hilfsverb steht an zweiter Stelle, das Partizip am Ende: Der Zeuge hat den Unfall gesehen."]},
+{id:'plus',t:'Plusquamperfekt',d:'Vorvergangenheit',b:[
+"# Bildung",
+"Präteritum von haben oder sein + Partizip II.",
+"ex: Ich hatte gegessen. Er war gegangen. Wir hatten gewartet.",
+"# Wann?",
+"Wenn zwei Dinge in der Vergangenheit passiert sind, steht das frühere im Plusquamperfekt.",
+"ex: Nachdem er gegessen hatte, ging er spazieren. (Zuerst essen, dann spazieren.)",
+"> Merke: Nach „nachdem“ steht oft das Plusquamperfekt, wenn der Hauptsatz im Präteritum steht. Steht der Hauptsatz im Perfekt, steht nach „nachdem“ das Perfekt: Nachdem er gegessen hat, ist er gegangen."]},
+{id:'fut1',t:'Futur I',d:'Zukunft und Vermutung',b:[
+"# Bildung",
+"werden (Präsens) + Infinitiv am Satzende.",
+"| Person | werden |",
+"| ich | werde |",
+"| du | wirst |",
+"| er/sie/es | wird |",
+"| wir | werden |",
+"| ihr | werdet |",
+"| sie | werden |",
+"ex: Ich werde morgen lernen. Es wird regnen.",
+"# Wann?",
+"• für die Zukunft: Ich werde die Prüfung bestehen.",
+"• für Vermutungen über die Gegenwart: Er wird wohl zu Hause sein.",
+"• für Versprechen und Drohungen: Ich werde es nicht wieder tun.",
+"> Merke: Im Alltag nimmt man meist das Präsens mit Zeitangabe: Morgen lerne ich."]},
+{id:'fut2',t:'Futur II',d:'In der Zukunft abgeschlossen',b:[
+"# Bildung",
+"werden (Präsens) + Partizip II + haben oder sein (Infinitiv).",
+"ex: Bis morgen werde ich den Bericht geschrieben haben. Er wird schon abgereist sein.",
+"# Wann?",
+"• für etwas, das bis zu einem Zeitpunkt in der Zukunft fertig ist",
+"• für Vermutungen über die Vergangenheit: Er wird es vergessen haben.",
+"> Merke: Das Futur II ist selten. Es steht oft mit Wörtern wie „bis“, „schon“, „wohl“."]}
+]},
+{g:'Deutsch: Steigerung',cat:'gr',c:'c5',items:[
+{id:'st0',t:'Positiv, Komparativ, Superlativ',d:'Die drei Stufen',b:[
+"# Die drei Stufen",
+"| Stufe | Bedeutung | Beispiel |",
+"| Positiv | Grundform | schnell |",
+"| Komparativ | Vergleichsstufe | schneller |",
+"| Superlativ | Höchststufe | am schnellsten |",
+"# Bildung",
+"• Komparativ: Grundform + **-er** (klein, kleiner)",
+"• Superlativ: **am** + Grundform + **-sten** (am kleinsten) oder der/die/das + -ste (der kleinste Tisch)",
+"• Endet die Grundform auf **d, t, s, ß, sch, x, z**, heißt es **-esten**: am ältesten, am heißesten, am kürzesten, am frischesten.",
+"• Ausnahme: groß, größer, am größten.",
+"# Umlaut bei vielen kurzen Wörtern",
+"alt – älter – am ältesten; jung – jünger; kalt – kälter; warm – wärmer; lang – länger; kurz – kürzer; stark – stärker; klug – klüger; scharf – schärfer; arm – ärmer; hart – härter.",
+"> Merke: Nicht jedes Wort bekommt einen Umlaut: schnell, schneller, klar, klarer, voll, voller, rund, runder."]},
+{id:'st1',t:'Unregelmäßige Steigerung',d:'gut, viel, gern, hoch …',b:[
+"# Diese Formen musst du auswendig kennen",
+"| Positiv | Komparativ | Superlativ |",
+"| gut | besser | am besten |",
+"| viel | mehr | am meisten |",
+"| gern | lieber | am liebsten |",
+"| hoch | höher | am höchsten |",
+"| nah | näher | am nächsten |",
+"| bald | eher | am ehesten |",
+"> Merke: Bei hoch fällt das c weg: hoch, aber höher. Bei nah wird aus h ein ch: am nächsten.",
+"# Achtung: Fehler vermeiden",
+"• falsch: „am bestesten“, „mehr besser“, „gutter“",
+"• richtig: am besten, besser"]},
+{id:'st2',t:'Vergleichen und Fehlerfallen',d:'so … wie, als, je … desto',b:[
+"# Vergleichswörter",
+"• Gleichheit: **so … wie** (Er ist so groß wie ich.)",
+"• Ungleichheit: Komparativ + **als** (Er ist größer als ich.)",
+"• Entwicklung: **je … desto** (Je mehr du übst, desto besser wirst du.)",
+"> Merke: Nach einem Komparativ steht „als“, nicht „wie“: besser als, nicht „besser wie“.",
+"# Nicht steigerbar",
+"Manche Adjektive haben schon die höchste Stufe: tot, einzig, schwanger, rund, perfekt, optimal, einmalig, ewig.",
+"ex: falsch: „das einzigste Kind“. Richtig: das einzige Kind.",
+"# Der Superlativ im Satz",
+"• vor einem Nomen: der schnellste Läufer, die längste Straße",
+"• bei Verben und Adjektiven nach sein: Er läuft am schnellsten. Er ist am schnellsten.",
+"# Elativ",
+"Der Superlativ ohne Vergleich bedeutet „sehr“: Mit herzlichsten Grüßen = mit sehr herzlichen Grüßen."]}
+]},
+{g:'Deutsch: Sätze und Wörter',cat:'gr',c:'c8',items:[
+{id:'wa',t:'Wortarten',d:'Nomen, Verb, Adjektiv und mehr',b:[
+"| Wortart | Erklärung | Beispiel |",
+"| Nomen | Namenwort, immer groß | der Mann, die Liebe |",
+"| Verb | Tunwort, wird gebeugt | laufen, du läufst |",
+"| Adjektiv | Eigenschaftswort | schnell, rot |",
+"| Artikel | Begleiter des Nomens | der, die, das, ein |",
+"| Pronomen | Fürwort | ich, mein, dieser, wer |",
+"| Präposition | Verhältniswort, verlangt einen Fall | in, auf, mit, wegen |",
+"| Konjunktion | Bindewort | und, weil, dass, obwohl |",
+"| Adverb | Umstandswort, bleibt gleich | heute, hier, gern |",
+"> Merke: Adjektive werden gesteigert (schön, schöner), Adverbien nicht (heute). Nomen kannst du mit einem Artikel verbinden, Verben nicht.",
+"# Nominalisierung",
+"Verben und Adjektive werden zu Nomen und damit großgeschrieben: das Laufen, beim Lesen, etwas Gutes, im Allgemeinen."]},
+{id:'satz',t:'Satzglieder und Satzbau',d:'Subjekt, Prädikat, Objekte',b:[
+"# Satzglieder",
+"• Subjekt (Wer oder was?): Der Polizist …",
+"• Prädikat (Was tut er?): … schreibt …",
+"• Dativobjekt (Wem?): … dem Zeugen …",
+"• Akkusativobjekt (Wen oder was?): … einen Brief.",
+"• Adverbiale (Wann? Wo? Wie? Warum?): gestern, im Büro, schnell, wegen des Regens",
+"# Verbstellung",
+"• Hauptsatz: Das Verb steht an **zweiter Stelle**: Heute kommt er. Er kommt heute.",
+"• Fragesatz ohne Fragewort: Verb an erster Stelle: Kommt er?",
+"• Nebensatz: Das Verb steht am **Ende**: …, weil er krank ist.",
+"# Hauptsatz und Nebensatz",
+"Konjunktionen für Nebensätze: weil, dass, obwohl, wenn, ob, damit, nachdem, während, sodass. Vor ihnen steht ein Komma.",
+"> Merke: Auch bei „und“ und „oder“ verbindest du Hauptsätze, das Verb bleibt dort an zweiter Stelle."]},
+{id:'pass',t:'Aktiv und Passiv',d:'Wer handelt? Was passiert?',b:[
+"# Aktiv und Passiv",
+"• Aktiv: Der Täter handelt. Der Polizist verhaftet den Mann.",
+"• Passiv: Das Geschehen steht im Mittelpunkt. Der Mann wird (vom Polizisten) verhaftet.",
+"# Bildung",
+"werden + Partizip II.",
+"| Zeit | Beispiel |",
+"| Präsens | Der Mann wird verhaftet. |",
+"| Präteritum | Der Mann wurde verhaftet. |",
+"| Perfekt | Der Mann ist verhaftet worden. |",
+"| Futur I | Der Mann wird verhaftet werden. |",
+"> Merke: Im Passiv-Perfekt heißt es „worden“, nicht „geworden“: ist verhaftet worden.",
+"# Zustandspassiv",
+"sein + Partizip II beschreibt das Ergebnis: Die Tür ist geschlossen."]},
+{id:'konj',t:'Konjunktiv',d:'Wunsch, Möglichkeit, indirekte Rede',b:[
+"# Konjunktiv II (Wunsch, Möglichkeit)",
+"• ich wäre, ich hätte, ich käme, ich ginge, ich könnte, ich würde gehen",
+"• Bedingung: Wenn ich Zeit hätte, würde ich kommen.",
+"• höfliche Bitte: Könnten Sie mir helfen?",
+"# Konjunktiv I (indirekte Rede)",
+"Er sagt: „Ich bin krank.“ → Er sagt, er sei krank.",
+"| Verb | Konjunktiv I |",
+"| sein | er sei, sie seien |",
+"| haben | er habe |",
+"| kommen | er komme |",
+"| können | er könne |",
+"| werden | er werde |",
+"> Merke: Ist der Konjunktiv I gleich wie der Indikativ (sie kommen), nimmt man den Konjunktiv II: Sie sagten, sie kämen."]}
+]},
+{g:'Rechtschreibung',cat:'rs',c:'c7',items:[
+{id:'das',t:'das oder dass',d:'Artikel, Pronomen oder Konjunktion',b:[
+"# Die Ersatzprobe",
+"Ersetze das Wort durch **dieses**, **jenes** oder **welches**. Klappt das, schreibst du **das** mit einem s. Klappt es nicht, schreibst du **dass**.",
+"ex: Das Auto, das dort steht, gehört mir. (dieses Auto, welches dort steht)",
+"ex: Ich weiß, dass er kommt. (nicht ersetzbar)",
+"# Die Wörter",
+"• das: Artikel (das Haus), Relativpronomen (das Buch, das ich lese), Demonstrativpronomen (das ist gut)",
+"• dass: Konjunktion, leitet einen Nebensatz ein, oft nach: wissen, glauben, sagen, hoffen, meinen, sehen",
+"> Merke: Vor „dass“ steht fast immer ein Komma."]},
+{id:'ss',t:'ß oder ss',d:'Lange und kurze Vokale',b:[
+"# Die Regel",
+"• Nach **langem Vokal** oder Doppellaut (au, ei, eu, äu) steht **ß**: Straße, Fuß, heiß, Grüße, draußen.",
+"• Nach **kurzem Vokal** steht **ss**: Wasser, muss, Fluss, Schloss, essen.",
+"# Probe",
+"Sprich das Wort. Ist der Vokal lang, kommt ß, ist er kurz, kommt ss.",
+"| Lang → ß | Kurz → ss |",
+"| Maß | Wasser |",
+"| groß | Fass |",
+"| fließen | Flüsse |",
+"> Merke: In der Schweiz gibt es kein ß. In Österreich und Deutschland gilt die Regel oben. Großbuchstaben: STRASSE oder STRAẞE.",
+"# Wortfamilie",
+"Der Stamm bleibt oft: fließen, Fluss, floss (Vokal wechselt, daher ss)."]},
+{id:'gk',t:'Groß- und Kleinschreibung',d:'Nomen, Anrede, Satzanfang',b:[
+"# Großschreibung",
+"• Satzanfang und Eigennamen: Graz, Anna",
+"• Nomen (alles, was man anfassen kann oder was man mit Artikel sagen kann): der Hund, die Freude",
+"• Nominalisierte Wörter: das Lesen, beim Laufen, etwas Neues, alles Gute",
+"• Tageszeiten nach heute, gestern, morgen: heute Abend, gestern Morgen, morgen Früh",
+"• Höfliche Anrede: Sie, Ihnen, Ihr (in Briefen: auch du, dein klein oder groß, beides erlaubt)",
+"# Kleinschreibung",
+"• Verben, Adjektive, Adverbien",
+"• Tageszeiten mit -s: abends, morgens, montags",
+"• Zahlwörter und Pronomen: jeder, man, viele (aber: das Dritte, die Vielen)",
+"> Merke: Kannst du einen Artikel, ein Adjektiv oder eine Präposition davor setzen (das, ein schöner, beim), schreibst du groß."]},
+{id:'komma',t:'Kommaregeln',d:'Aufzählung, Nebensatz, Infinitiv',b:[
+"# Das Komma steht",
+"• in **Aufzählungen**: Äpfel, Birnen, Nüsse und Trauben. Vor „und“ und „oder“ steht kein Komma.",
+"• zwischen **Hauptsatz und Nebensatz**: Ich weiß, dass er kommt.",
+"• vor „aber“, „sondern“, „doch“: Er ist müde, aber er arbeitet.",
+"• bei **Einschüben** und Beisätzen: Herr Berger, mein Nachbar, hilft mir.",
+"• bei **Anrede** und Ausruf: Anna, komm her!",
+"# Infinitiv mit zu",
+"Das Komma ist meist freiwillig. Es ist nötig bei um … zu, ohne … zu, statt … zu: Er ging, um einzukaufen.",
+"> Merke: Vor „weil“, „dass“, „obwohl“, „wenn“, „damit“ steht immer ein Komma."]},
+{id:'dehn',t:'Dehnung und Schärfung',d:'Doppelte Buchstaben, h, ie',b:[
+"# Kurze Vokale (Schärfung)",
+"Nach einem kurzen Vokal folgt oft ein **Doppelkonsonant**: Mitte, kommen, Bett, Sonne.",
+"• statt kk wird ck, statt zz wird tz: Zucker, Katze.",
+"# Lange Vokale (Dehnung)",
+"• einfaches ie (am häufigsten): Biene, Liebe, Tier",
+"• Dehnungs-h: Zahl, Jahr, Bahn, nehmen",
+"• Doppelvokal: Saal, Meer, Boot, Haar",
+"• nur ein Buchstabe: Hose, Name, Tafel",
+"> Merke: Beim Verlängern hilft die Wortfamilie: Hand – Hände, Rad – Räder (mit d). Ein Wort mit Dehnungs-h behält es oft: nehmen, Nähe.",
+"# Typische Fehler",
+"Standard (nicht Standart), Maschine, Stadt, vielleicht, ziemlich, Adresse, Rhythmus."]},
+{id:'verw',t:'Wörter, die man verwechselt',d:'seit/seid, wieder/wider, Stadt/statt',b:[
+"| Wort | Bedeutung | Beispiel |",
+"| seit | Zeit (seit wann?) | seit gestern |",
+"| seid | sein (ihr seid) | ihr seid pünktlich |",
+"| wieder | nochmals | er kommt wieder |",
+"| wider | gegen | wider Willen |",
+"| Stadt | Ort | die Stadt Graz |",
+"| statt | anstatt | statt des Autos |",
+"| Lid | Augenlid | das Lid |",
+"| Lied | Gesang | das Lied |",
+"| Wal | Tier | der Wal |",
+"| Wahl | Auswahl | die Wahl |",
+"| Rat | Ratschlag | ein Rat |",
+"| Rad | Fahrrad | das Rad |",
+"| mahlen | Mehl | Korn mahlen |",
+"| malen | Bild | ein Bild malen |",
+"> Merke: Bei Wörtern, die gleich klingen, hilft der Satz: Der Zusammenhang zeigt, welches Wort gemeint ist."]}
+]},
+{g:'Bruchrechnen',cat:'ma',c:'c3',items:[
+{id:'br0',t:'Brüche: Kürzen und Erweitern',d:'Zähler, Nenner, gleichwertige Brüche',b:[
+"# Aufbau",
+"Ein Bruch besteht aus **Zähler** (oben) und **Nenner** (unten). Der Nenner sagt, in wie viele gleiche Teile das Ganze geteilt ist. Der Zähler sagt, wie viele Teile du hast.",
+"ex: 3/4 bedeutet drei von vier Teilen.",
+"# Kürzen",
+"Zähler und Nenner durch dieselbe Zahl teilen. Der Wert bleibt gleich.",
+"ex: 6/8 = 3/4 (beide durch 2)",
+"# Erweitern",
+"Zähler und Nenner mit derselben Zahl malnehmen.",
+"ex: 2/3 = 8/12 (beide mal 4)",
+"> Merke: Kürze vollständig, indem du durch den größten gemeinsamen Teiler (ggT) teilst: 12/18, ggT ist 6, also 2/3.",
+"# Vergleichen",
+"Brüche mit gleichem Nenner: der mit dem größeren Zähler ist größer. Verschiedene Nenner: auf gleichen Nenner bringen (Hauptnenner)."]},
+{id:'br1',t:'Brüche addieren und subtrahieren',d:'Gleicher Nenner nötig',b:[
+"# Gleicher Nenner",
+"Nur die Zähler rechnen, der Nenner bleibt.",
+"ex: 2/7 + 3/7 = 5/7",
+"# Verschiedene Nenner",
+"1. Hauptnenner suchen (kleinstes gemeinsames Vielfaches).",
+"2. Beide Brüche erweitern.",
+"3. Zähler addieren oder subtrahieren.",
+"4. Wenn möglich kürzen.",
+"ex: 1/2 + 1/3 = 3/6 + 2/6 = 5/6",
+"ex: 3/4 − 1/6 = 9/12 − 2/12 = 7/12",
+"> Merke: Nenner niemals addieren. 1/2 + 1/3 ist nicht 2/5."]},
+{id:'br2',t:'Brüche multiplizieren',d:'Zähler mal Zähler, Nenner mal Nenner',b:[
+"# Regel",
+"Zähler mit Zähler und Nenner mit Nenner multiplizieren.",
+"ex: 2/3 · 4/5 = 8/15",
+"# Tipp: vorher kürzen",
+"Kreuzweise kürzen spart Arbeit: 3/4 · 8/9: 3 und 9 durch 3, 8 und 4 durch 4: 1/1 · 2/3 = 2/3.",
+"# Bruch von einer Zahl",
+"„von“ heißt mal: Drei Viertel von 40 sind 3/4 · 40 = 30. Oder: erst durch den Nenner teilen (40 : 4 = 10), dann mal den Zähler (10 · 3 = 30).",
+"> Merke: Beim Multiplizieren brauchst du keinen gemeinsamen Nenner."]},
+{id:'br3',t:'Brüche dividieren',d:'Mit dem Kehrwert malnehmen',b:[
+"# Regel",
+"Durch einen Bruch teilen heißt mit seinem **Kehrwert** malnehmen. Der Kehrwert entsteht, wenn du Zähler und Nenner vertauschst.",
+"ex: 2/3 : 4/5 = 2/3 · 5/4 = 10/12 = 5/6",
+"# Durch eine ganze Zahl",
+"Die ganze Zahl hat den Nenner 1. Teilen durch 3 heißt mal 1/3.",
+"ex: 3/4 : 3 = 3/4 · 1/3 = 1/4",
+"> Merke: Den ersten Bruch änderst du nicht, nur den zweiten (Kehrwert)."]},
+{id:'br4',t:'Gemischte Zahlen',d:'Unechte Brüche umwandeln',b:[
+"# Begriffe",
+"• echter Bruch: Zähler kleiner als Nenner (3/4)",
+"• unechter Bruch: Zähler größer als Nenner (7/4)",
+"• gemischte Zahl: ganze Zahl + Bruch (1 3/4)",
+"# Gemischte Zahl → unechter Bruch",
+"Ganze Zahl mal Nenner plus Zähler, über denselben Nenner.",
+"ex: 2 1/3 = (2·3 + 1)/3 = 7/3",
+"# Unechter Bruch → gemischte Zahl",
+"Zähler durch Nenner teilen, der Rest ist der neue Zähler.",
+"ex: 11/4: 11 : 4 = 2 Rest 3, also 2 3/4",
+"> Merke: Zum Rechnen wandelst du gemischte Zahlen zuerst in unechte Brüche um."]},
+{id:'br5',t:'Bruch, Dezimalzahl, Prozent',d:'Wichtige Werte auswendig',b:[
+"# Umrechnen",
+"• Bruch → Dezimalzahl: Zähler durch Nenner teilen (3 : 4 = 0,75)",
+"• Dezimalzahl → Prozent: mal 100 (0,75 = 75 %)",
+"# Die wichtigsten Werte",
+"| Bruch | Dezimal | Prozent |",
+"| 1/2 | 0,5 | 50 % |",
+"| 1/4 | 0,25 | 25 % |",
+"| 3/4 | 0,75 | 75 % |",
+"| 1/5 | 0,2 | 20 % |",
+"| 1/8 | 0,125 | 12,5 % |",
+"| 1/10 | 0,1 | 10 % |",
+"| 1/3 | 0,333… | 33,3 % |",
+"| 2/3 | 0,666… | 66,7 % |",
+"> Merke: Wer diese Werte kennt, rechnet Prozent- und Bruchaufgaben viel schneller."]}
+]},
+{g:'Rechnen',cat:'ma',c:'c9',items:[
+{id:'pr',t:'Prozentrechnung',d:'Grundwert, Prozentsatz, Prozentwert',b:[
+"# Die drei Größen",
+"• Grundwert (G): das Ganze (100 %)",
+"• Prozentsatz (p): wie viel Prozent",
+"• Prozentwert (W): der Teil",
+"| Gesucht | Formel |",
+"| Prozentwert | W = G · p / 100 |",
+"| Prozentsatz | p = W / G · 100 |",
+"| Grundwert | G = W / p · 100 |",
+"ex: 20 % von 150 sind 150 · 20 / 100 = 30.",
+"# Aufschlag und Abschlag",
+"• 20 % mehr: mal 1,2",
+"• 20 % weniger: mal 0,8",
+"ex: 80 Euro plus 25 % = 80 · 1,25 = 100 Euro.",
+"> Merke: Prozent ist nicht gleich Prozentpunkt. Steigt ein Wert von 10 % auf 15 %, sind das 5 Prozentpunkte, aber 50 % mehr.",
+"# Kopfrechnen",
+"10 % = durch 10. 5 % = die Hälfte von 10 %. 1 % = durch 100. 25 % = durch 4."]},
+{id:'dre',t:'Dreisatz',d:'Direkt und indirekt proportional',b:[
+"# Direkt proportional (je mehr, desto mehr)",
+"3 Kilo kosten 6 Euro. Was kosten 5 Kilo?",
+"1. Auf eins: 6 : 3 = 2 Euro pro Kilo.",
+"2. Auf das Ziel: 2 · 5 = 10 Euro.",
+"# Indirekt proportional (je mehr, desto weniger)",
+"4 Arbeiter brauchen 6 Tage. Wie lange brauchen 3 Arbeiter?",
+"1. Auf eins: 4 · 6 = 24 Arbeitertage.",
+"2. Auf das Ziel: 24 : 3 = 8 Tage.",
+"> Merke: Frage dich: Wird es mehr oder weniger, wenn die andere Größe steigt? Danach richtest du Teilen und Malnehmen."]},
+{id:'pot',t:'Potenzen und Wurzeln',d:'Quadratzahlen und Rechenregeln',b:[
+"# Quadratzahlen",
+"1, 4, 9, 16, 25, 36, 49, 64, 81, 100, 121, 144, 169, 196, 225",
+"# Kubikzahlen",
+"1, 8, 27, 64, 125, 216, 1000",
+"# Regeln",
+"• a² = a · a, a³ = a · a · a",
+"• Zahl hoch 0 ist 1, Zahl hoch 1 ist die Zahl selbst",
+"• Wurzel ist die Umkehrung: √49 = 7, weil 7² = 49",
+"• gleiche Basis multiplizieren: Exponenten addieren (2³ · 2² = 2⁵ = 32)",
+"> Merke: Minus mal Minus ergibt Plus, deshalb ist (−3)² = 9. Aber −3² = −9."]},
+{id:'ein',t:'Einheiten umrechnen',d:'Länge, Gewicht, Zeit, Volumen',b:[
+"| Größe | Umrechnung |",
+"| Länge | 1 km = 1000 m, 1 m = 100 cm, 1 cm = 10 mm |",
+"| Gewicht | 1 t = 1000 kg, 1 kg = 1000 g |",
+"| Volumen | 1 l = 1000 ml, 1 m³ = 1000 l |",
+"| Zeit | 1 h = 60 min, 1 min = 60 s, 1 Tag = 24 h |",
+"| Fläche | 1 m² = 10 000 cm², 1 ha = 10 000 m² |",
+"# Geschwindigkeit",
+"km/h in m/s: durch 3,6. m/s in km/h: mal 3,6.",
+"ex: 72 km/h = 20 m/s",
+"> Merke: Bei Flächen ist der Umrechnungsfaktor das Quadrat (100 mal 100), bei Volumen die dritte Potenz (10 mal 10 mal 10)."]},
+{id:'tempo',t:'Tempo, Weg, Zeit, Durchschnitt',d:'s = v · t',b:[
+"# Weg, Geschwindigkeit, Zeit",
+"• Weg = Geschwindigkeit · Zeit (s = v · t)",
+"• Geschwindigkeit = Weg : Zeit",
+"• Zeit = Weg : Geschwindigkeit",
+"ex: 90 km/h für 2,5 Stunden: 90 · 2,5 = 225 km.",
+"# Durchschnitt (Mittelwert)",
+"Summe aller Werte geteilt durch die Anzahl.",
+"ex: 4, 7, 10: (4 + 7 + 10) : 3 = 7",
+"# Median",
+"Der mittlere Wert, wenn man die Zahlen der Größe nach ordnet. Bei gerader Anzahl: Mittel der beiden mittleren Werte.",
+"> Merke: Bei Hin- und Rückfahrt mit unterschiedlichem Tempo ist die Durchschnittsgeschwindigkeit nicht der einfache Mittelwert. Rechne Gesamtweg durch Gesamtzeit."]},
+{id:'regel',t:'Rechenregeln und Teilbarkeit',d:'Punkt vor Strich, Primzahlen',b:[
+"# Reihenfolge",
+"1. Klammern",
+"2. Potenzen und Wurzeln",
+"3. Punkt vor Strich (· und : vor + und −)",
+"4. Von links nach rechts",
+"ex: 3 + 4 · 2 = 11, aber (3 + 4) · 2 = 14",
+"# Teilbarkeit",
+"• durch 2: letzte Ziffer gerade",
+"• durch 3: Quersumme durch 3 teilbar",
+"• durch 4: letzte zwei Ziffern durch 4 teilbar",
+"• durch 5: endet auf 0 oder 5",
+"• durch 9: Quersumme durch 9 teilbar",
+"• durch 10: endet auf 0",
+"# Primzahlen bis 100",
+"2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97",
+"> Merke: 1 ist keine Primzahl, 2 ist die einzige gerade Primzahl."]}
+]},
+{g:'Logik',cat:'zr',c:'c8',items:[
+{id:'zrr',t:'Zahlenreihen erkennen',d:'Typische Regeln',b:[
+"# So gehst du vor",
+"1. Schreibe die Abstände zwischen den Zahlen auf.",
+"2. Sind die Abstände gleich? Dann ist es eine Addition oder Subtraktion.",
+"3. Wachsen die Abstände regelmäßig? Dann siehst du die Differenzen der Differenzen an.",
+"4. Verdoppeln oder verdreifachen sich die Zahlen? Dann ist es eine Multiplikation.",
+"# Häufige Regeln",
+"• gleichbleibend: 3, 7, 11, 15 (+4)",
+"• wachsende Schritte: 1, 2, 4, 7, 11 (+1, +2, +3, +4)",
+"• malnehmen: 2, 6, 18, 54 (·3)",
+"• Quadratzahlen: 1, 4, 9, 16, 25",
+"• Fibonacci: 1, 1, 2, 3, 5, 8 (Summe der letzten zwei)",
+"• zwei Reihen abwechselnd: 2, 10, 4, 20, 6, 30",
+"• Primzahlen: 2, 3, 5, 7, 11",
+"> Merke: Prüfe die Regel an jedem Glied, nicht nur an den ersten beiden.",
+"# Buchstabenreihen",
+"Wandle Buchstaben in Zahlen um: A=1, B=2, C=3, D=4, E=5, F=6, G=7, H=8, I=9, J=10, K=11, L=12, M=13, N=14, O=15, P=16, Q=17, R=18, S=19, T=20, U=21, V=22, W=23, X=24, Y=25, Z=26."]}
+]}
+];
+const LEXI={};LEX.forEach(g=>g.items.forEach(x=>{LEXI[x.id]=x;x.cat=g.cat;x.g=g.g;}));
+const LEX_ALL=LEX.flatMap(g=>g.items);
+const lexMk0=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+function lexBody(L){
+  let h='',list=[],tb=[];
+  const fl=()=>{if(list.length){h+=`<ul class="sub" style="margin:4px 0 8px;padding-left:20px;color:var(--ink)">${list.map(x=>`<li style="margin:3px 0">${lexMk(x)}</li>`).join('')}</ul>`;list=[];}
+    if(tb.length){h+=`<div class="fig" style="margin:6px 0 10px"><table class="t" style="min-width:100%">${tb.map((r,i)=>`<tr>${r.map(c=>i?`<td>${lexMk(c)}</td>`:`<th style="text-align:left;padding:6px 4px">${lexMk(c)}</th>`).join('')}</tr>`).join('')}</table></div>`;tb=[];}};
+  for(const l of L){
+    if(l.startsWith('• ')){if(tb.length)fl();list.push(l.slice(2));continue;}
+    if(l.startsWith('|')){if(list.length)fl();tb.push(l.split('|').slice(1,-1).map(x=>x.trim()));continue;}
+    fl();
+    if(l.startsWith('# '))h+=`<h3 style="margin:16px 0 4px">${lexMk(l.slice(2))}</h3>`;
+    else if(l.startsWith('> '))h+=`<div class="exp" style="white-space:normal"><b>${lexMk(l.slice(2).split(':')[0])}:</b>${lexMk(l.slice(2).split(':').slice(1).join(':'))}</div>`;
+    else if(l.startsWith('ex: '))h+=`<p style="margin:6px 0;padding:8px 12px;border-left:3px solid var(--tint);background:var(--card2);border-radius:0 10px 10px 0">${lexMk(l.slice(4))}</p>`;
+    else h+=`<p style="margin:6px 0">${lexMk(l)}</p>`;
+  }
+  fl();return h;
+}
+/* ---------- Nachschlagen 2: Thema → Seiten → Selbsttest, mit Bildern ---------- */
+(function(){const st=document.createElement('style');st.textContent=`
+.lxs{display:block;width:100%;max-width:560px;height:auto;margin:6px auto}
+.lxt{fill:var(--ink);font:600 13px var(--font)}.lxsm{fill:var(--mute);font-weight:500}
+.lxhero{border-radius:18px;padding:16px 16px 14px;margin:8px 0 12px;color:#fff;background:var(--c);background:linear-gradient(135deg,var(--c),color-mix(in srgb,var(--c) 68%,#000))}
+.lxhero .e{font-size:38px;line-height:1}.lxhero h1{color:#fff;font-size:27px;margin:6px 0 2px}.lxhero p{margin:2px 0 0;font-size:15px;opacity:.96}
+.lxk{background:var(--card);border-radius:14px;padding:12px 14px;margin:10px 0;border-left:6px solid var(--c,var(--tint));box-shadow:var(--shadow)}
+.lxk>.lxl{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);margin-bottom:3px}
+.lxmerk{background:var(--warn-bg);color:var(--ink);border-radius:14px;padding:12px 14px;margin:10px 0}
+.lxrow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--card);border:0;border-left:6px solid var(--c);border-radius:12px;padding:12px 14px;margin:8px 0;cursor:pointer;color:var(--ink);box-shadow:var(--shadow)}
+.lxrow .t{flex:1;min-width:0}.lxrow b{display:block;font-size:17px}.lxrow .d{display:block;color:var(--mute);font-size:14px;margin-top:2px}.lxrow .r{font-size:13px;color:var(--mute);white-space:nowrap}
+.lxgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.lxc{border:0;border-radius:16px;padding:14px;text-align:left;color:#fff;cursor:pointer;background:var(--c);background:linear-gradient(135deg,var(--c),color-mix(in srgb,var(--c) 68%,#000));min-height:116px;display:flex;flex-direction:column;justify-content:space-between;gap:8px}
+.lxc .e{font-size:30px;line-height:1}.lxc b{font-size:17px;line-height:1.2}.lxc small{opacity:.95;font-size:13px}
+.lxch{display:flex;align-items:center;gap:10px;margin:6px 0;padding:8px 10px;border-radius:10px;background:var(--card2)}
+.lxch i{flex:0 0 12px;height:34px;border-radius:6px;background:var(--c)}.lxch b{font-size:15px}.lxch span{display:block;font-size:14px;color:var(--ink2)}
+.lxprog{height:8px;background:var(--track);border-radius:4px;overflow:hidden;margin:8px 0}.lxprog>i{display:block;height:100%;background:var(--ok)}
+`;document.head.appendChild(st);})();
+const BL='#0A5FC8',PU='#8E3FC4',GN='#1B7F37',RD='#C4161C',OR='#B45309',GY='#6C6C70',IN='#4F46E5';
+const TOP=[
+{k:'faelle',t:'Die vier Fälle',e:'🧩',c:BL,lead:'Wer? Wessen? Wem? Wen? Mit vier Fragen erkennst du jeden Fall.',cheat:[['Nominativ','Wer oder was?  ·  der Mann',BL],['Genitiv','Wessen?  ·  des Mannes',PU],['Dativ','Wem?  ·  dem Mann',GN],['Akkusativ','Wen oder was?  ·  den Mann',RD]]},
+{k:'zeiten',t:'Die Zeiten',e:'⏳',c:OR,lead:'Sechs Zeitformen, ein Bauplan: Hilfsverb vorne, Partizip hinten.',cheat:[['Präsens','ich gehe  ·  jetzt',GN],['Präteritum','ich ging  ·  Bericht',OR],['Perfekt','ich bin gegangen  ·  Alltag',OR],['Plusquamperfekt','ich war gegangen  ·  davor',PU],['Futur I','ich werde gehen  ·  Zukunft',BL],['Futur II','ich werde gegangen sein  ·  dann fertig',IN]]},
+{k:'steigerung',t:'Steigerung',e:'📈',c:RD,lead:'gut, besser, am besten: Vergleichen mit drei Stufen.',cheat:[['Positiv','schnell',GY],['Komparativ','schneller  ·  + er',OR],['Superlativ','am schnellsten  ·  am + sten',RD]]},
+{k:'satz',t:'Sätze und Wörter',e:'🧱',c:IN,lead:'Wortarten, Satzbau, Passiv und Konjunktiv.'},
+{k:'rs',t:'Rechtschreibung',e:'✏️',c:'#0E7490',lead:'Die Regeln, die in jedem Test vorkommen.'},
+{k:'bruch',t:'Bruchrechnen',e:'🍕',c:GN,lead:'Brüche sehen und verstehen: mit Bildern statt nur Formeln.',cheat:[['+ und −','gleicher Nenner nötig  ·  1/2 + 1/3 = 5/6',GN],['mal','oben mal oben, unten mal unten  ·  2/3 · 4/5 = 8/15',OR],['geteilt','mal Kehrwert  ·  2/3 : 4/5 = 5/6',PU]]},
+{k:'rechnen',t:'Rechnen',e:'🧮',c:'#8C6A44',lead:'Prozent, Dreisatz, Einheiten und Tempo, Schritt für Schritt.'},
+{k:'logik',t:'Logik',e:'🔢',c:GY,lead:'Zahlen- und Buchstabenreihen sicher knacken.'}
+];
+LEX.forEach((g,i)=>{g.items.forEach(x=>{x.ti=i;});});
+const TOPK={};TOP.forEach((t,i)=>{TOPK[t.k]=i;});
+const LX={
+fall0:{k:'Jeder Fall hat eine Frage: **Wer?** (Nom.), **Wessen?** (Gen.), **Wem?** (Dat.), **Wen?** (Akk.). Nur beim männlichen Wort sind alle vier Artikel verschieden.',m:'Der Mann (Wer?), des Mannes Hut (Wessen?), ich helfe dem Mann (Wem?), ich sehe den Mann (Wen?).',q:[['Welche Frage gehört zum Dativ?',['Wer oder was?','Wessen?','Wem?','Wen oder was?'],2],['Bei welchem Geschlecht unterscheiden sich alle vier Fälle im Artikel?',['männlich','weiblich','sächlich','Plural'],0],['Ich sehe ___ Mann. (Akkusativ)',['der','den','dem','des'],1]]},
+nom:{c:BL,k:'Nominativ = das Subjekt, **Wer oder was?** Er steht auch nach sein, werden, bleiben.',q:[['Welcher Fall steht nach „sein“, „werden“ und „bleiben“?',['Nominativ','Genitiv','Dativ','Akkusativ'],0],['In „Der Hund bellt“ ist „Der Hund“ …',['Subjekt im Nominativ','Objekt im Akkusativ','Objekt im Dativ','Genitivattribut'],0]]},
+gen:{c:PU,k:'Genitiv = **Wessen?** Besitz und Zugehörigkeit. Männlich und sächlich bekommen -s oder -es. Merke: wegen, trotz, während, statt.',m:'Wegen des Wetters, trotz des Verbots, während der Fahrt: Die Wörter wegen, trotz, während, statt wollen den Genitiv.',q:[['Wegen ___ Regens blieb er daheim.',['der','dem','des','den'],2],['Das Auto ___ Nachbarn steht dort. (Wessen?)',['der','des','dem','den'],1],['Welche Präposition verlangt den Genitiv?',['mit','trotz','bei','durch'],1]]},
+dat:{c:GN,k:'Dativ = **Wem?** Der Empfänger. Dativ-Wörter: aus, außer, bei, mit, nach, seit, von, zu. Im Plural kommt ein -n dazu: den Kindern.',m:'Aus, außer, bei, mit, nach, seit, von, zu: dem Dativ gehört die Ruh. Und: Ich gebe DEM Mann.',q:[['Welche Präposition verlangt immer den Dativ?',['für','durch','mit','ohne'],2],['Ich helfe ___ Frau.',['die','der','den','des'],1],['Das Buch gehört ___ Kindern.',['die','den','der','das'],1]]},
+akk:{c:RD,k:'Akkusativ = **Wen oder was?** Das direkte Objekt. Nur männlich ändert sich: der → den. Immer Akkusativ: bis, durch, für, gegen, ohne, um.',m:'Für, um, durch, gegen, ohne, bis: diese sechs wollen den Akkusativ. Männlich wird aus „der“ ein „den“.',q:[['Welche Präposition verlangt immer den Akkusativ?',['mit','von','für','bei'],2],['Er kauft ___ Hund.',['der','den','dem','des'],1],['Welcher Artikel ändert sich vom Nominativ zum Akkusativ?',['der','die','das','die (Plural)'],0]]},
+wech:{c:OR,k:'an, auf, hinter, in, neben, über, unter, vor, zwischen: **Wo?** (ruhen) → Dativ. **Wohin?** (Bewegung) → Akkusativ.',m:'WO bleibt DEM (ruhig). WOHIN geht DEN Weg (Bewegung).',q:[['Wohin? Ich stelle die Vase auf ___ Tisch.',['dem','den','der','des'],1],['Wo? Die Vase steht auf ___ Tisch.',['dem','den','der','des'],0],['Wo? Er sitzt in ___ Küche.',['die','der','den','das'],1]]},
+zeit0:{k:'Sechs Zeitformen. Alltag und Gespräch in Österreich: **Perfekt**. Berichte: **Präteritum**. Vorvergangenheit: **Plusquamperfekt**.',m:'Hilfsverb vorne, Partizip hinten: die Klammer. „Ich habe den Bericht geschrieben.“',q:[['Welche Zeitform ist „ich war gegangen“?',['Perfekt','Plusquamperfekt','Präteritum','Futur II'],1],['Welche Zeitform nutzt man in Österreich im Gespräch meist für Vergangenes?',['Futur II','Plusquamperfekt','Perfekt','Futur I'],2],['„Ich werde gehen“ ist …',['Präsens','Futur I','Futur II','Perfekt'],1]]},
+praes:{c:GN,k:'Endungen: -e, -st, -t, -en, -t, -en. Endet der Stamm auf d oder t, kommt ein e dazu (du arbeitest). Bei e → i und a → ä ändert sich der Vokal.',q:[['du ___ (sehen)',['sehst','siehst','sieht','sehest'],1],['er ___ (fahren)',['fahrt','fährt','fährst','fahrst'],1],['du ___ (arbeiten)',['arbeitst','arbeitest','arbeite','arbeitet'],1]]},
+praet:{c:OR,k:'Schwach: Stamm + **te** (machte). Stark: Vokalwechsel, kein -te (ging). Bei ich und er sieht das Verb gleich aus: ich ging, er ging.',q:[['Präteritum von „gehen“ (ich)?',['gehte','gang','ging','gegangen'],2],['Präteritum von „machen“ (er)?',['machte','mach','gemacht','mochte'],0],['Präteritum von „wissen“ (ich)?',['wisste','wusste','wiss','gewusst'],1]]},
+perf:{c:OR,k:'haben oder sein + **Partizip II**. **sein** bei Bewegung (gehen, fahren) und Zustandswechsel (einschlafen). Sonst **haben**.',m:'Bewegung oder Wechsel: SEIN. Alles andere: HABEN.',q:[['Wir ___ nach Graz gefahren.',['haben','sind','werden','hatten'],1],['Partizip II von „aufmachen“?',['geaufmacht','aufgemacht','aufmachte','aufgemachen'],1],['Partizip II von „telefonieren“?',['getelefoniert','telefoniert','telefonieren','getelefont'],1]]},
+plus:{c:PU,k:'hatte oder war + Partizip II. Für das, was **vor** etwas anderem in der Vergangenheit passiert ist.',q:[['Nachdem er gegessen ___, ging er spazieren.',['hat','hatte','war','wurde'],1],['Plusquamperfekt von „kommen“ (er)?',['er kam','er ist gekommen','er war gekommen','er wird kommen'],2]]},
+fut1:{c:BL,k:'werden + Infinitiv. Für Zukunft, Versprechen und **Vermutungen**: Er wird wohl zu Hause sein.',q:[['Futur I von „lernen“ (ich)?',['ich lerne','ich werde lernen','ich lernte','ich habe gelernt'],1],['„Er wird wohl zu Hause sein“ drückt aus …',['Vermutung','Vergangenheit','Befehl','Wunsch'],0]]},
+fut2:{c:IN,k:'werden + Partizip II + haben/sein. Etwas ist bis zu einem Zeitpunkt in der Zukunft **fertig** oder eine Vermutung über Vergangenes.',q:[['Futur II von „schreiben“ (ich)?',['ich werde schreiben','ich werde geschrieben haben','ich habe geschrieben','ich hatte geschrieben'],1],['„Er wird es vergessen haben.“ bedeutet vor allem …',['Vermutung über Vergangenes','Plan','Befehl','Gewohnheit'],0]]},
+st0:{c:RD,k:'Komparativ: **-er**. Superlativ: **am -sten**. Nach d, t, s, ß, sch, x, z: **am -esten** (am ältesten, am heißesten).',m:'Zwei Schritte nach oben: schnell, schnell**er**, am schnell**sten**.',q:[['Superlativ von „alt“?',['am altesten','am ältesten','am älteren','am altsten'],1],['Komparativ von „klein“?',['kleiner','am kleinsten','kleinere','kleinster'],0],['Superlativ von „heiß“?',['am heißten','am heißesten','am heißsten','am heissten'],1]]},
+st1:{c:RD,k:'Diese Formen sind anders: gut, besser, am besten · viel, mehr, am meisten · gern, lieber, am liebsten · hoch, höher, am höchsten · nah, näher, am nächsten.',q:[['Komparativ von „gut“?',['guter','besser','gutter','bester'],1],['Superlativ von „viel“?',['am meisten','am vielsten','am mehrsten','am meistesten'],0],['Komparativ von „gern“?',['gerner','mehr','lieber','besser'],2]]},
+st2:{c:RD,k:'Gleichheit: **so … wie**. Ungleichheit: Komparativ + **als**. Nicht steigerbar: tot, einzig, schwanger, perfekt.',q:[['Er ist größer ___ ich.',['wie','als','denn','so'],1],['Er ist so groß ___ ich.',['als','wie','denn','so'],1],['Welches Wort ist nicht steigerbar?',['schnell','einzig','klein','hell'],1]]},
+wa:{k:'Nomen, Verb, Adjektiv, Artikel, Pronomen, Präposition, Konjunktion, Adverb. Adjektive kann man steigern, Adverbien nicht.',q:[['Welche Wortart ist „heute“?',['Nomen','Adjektiv','Adverb','Verb'],2],['„weil“ ist eine …',['Präposition','Konjunktion','Artikel','Verb'],1]]},
+satz:{k:'Hauptsatz: Verb an **zweiter** Stelle. Nebensatz (weil, dass, obwohl): Verb am **Ende**, davor ein Komma.',m:'Hauptsatz: Verb auf Platz 2. Nebensatz: Verb ganz hinten.',q:[['Im Hauptsatz steht das Verb an …',['erster Stelle','zweiter Stelle','letzter Stelle','dritter Stelle'],1],['Im Nebensatz mit „weil“ steht das Verb …',['am Ende','an zweiter Stelle','am Anfang','in der Mitte'],0]]},
+pass:{k:'Passiv = **werden + Partizip II**. Das Geschehen steht im Mittelpunkt, nicht der Handelnde. Perfekt: ist verhaftet **worden**.',q:[['Passiv von „Der Polizist verhaftet den Mann“?',['Der Mann wird verhaftet.','Der Mann verhaftet.','Der Mann hat verhaftet.','Der Mann ist verhaften.'],0],['Passiv-Perfekt: Er ist verhaftet ___.',['geworden','worden','wurde','werden'],1]]},
+konj:{k:'Konjunktiv II für Wunsch und Bedingung (hätte, wäre, käme, würde). Konjunktiv I für indirekte Rede (er sei, er habe).',q:[['Konjunktiv II von „haben“ (ich)?',['hatte','hätte','habe','würde haben'],1],['Indirekte Rede: Er sagt, er ___ krank.',['ist','sei','war','wird'],1]]},
+das:{k:'Ersatzprobe: Passt **dieses**, **jenes** oder **welches**? Dann **das**. Sonst **dass**. Vor „dass“ steht ein Komma.',m:'dass-Satz = „Ich weiß, dass …“. Alles, was man durch „dieses“ ersetzen kann, ist „das“.',q:[['Das Auto, ___ dort steht, ist rot.',['dass','das','daß','dies'],1],['Ich glaube, ___ er recht hat.',['das','dass','dies','was'],1]]},
+ss:{k:'Nach **langem** Vokal oder Doppellaut: **ß** (Straße, heiß). Nach **kurzem** Vokal: **ss** (Wasser, muss).',m:'Lang gezogen = ß (Fuß). Kurz und knapp = ss (Fluss).',q:[['Die Stra__e ist lang.',['ss','ß'],1],['Das Wa__er ist kalt.',['ss','ß'],0],['Welches Wort ist richtig?',['Fuss','Fuß','Fus','Fuβ'],1]]},
+gk:{k:'Groß: Nomen, Satzanfang, Namen, Nominalisiertes (das Lesen, beim Laufen), Tageszeit nach heute/gestern (heute Abend). Klein: Verben, Adjektive, Adverbien (abends).',q:[['Welcher Satz ist richtig?',['Ich gehe zum Schwimmen.','Ich gehe zum schwimmen.','Ich Gehe zum Schwimmen.','ich gehe zum schwimmen.'],0],['Wir sehen uns heute ___.',['abend','Abend'],1]]},
+komma:{k:'Komma bei Aufzählungen, vor Nebensätzen (dass, weil, obwohl), vor aber/sondern, bei Einschüben. **Kein** Komma vor „und“ und „oder“ in Aufzählungen.',q:[['Wo steht das Komma richtig?',['Ich weiß dass er kommt.','Ich weiß, dass er kommt.','Ich, weiß dass er kommt.','Ich weiß dass, er kommt.'],1],['Welcher Satz ist richtig?',['Äpfel, Birnen, und Nüsse.','Äpfel, Birnen und Nüsse.','Äpfel Birnen, und Nüsse.','Äpfel, Birnen, und, Nüsse.'],1]]},
+dehn:{k:'Kurzer Vokal: oft Doppelkonsonant (Mitte, Bett). Langer Vokal: ie, Dehnungs-h oder Doppelvokal (Liebe, Zahl, Meer). Wortfamilie hilft beim Schreiben.',q:[['Welche Schreibweise ist richtig?',['Standart','Standard','Standardt','Stantard'],1],['Welche Schreibweise ist richtig?',['Maschiene','Maschine','Maschinne','Mashine'],1],['Welche Schreibweise ist richtig?',['vieleicht','vielleicht','villeicht','fielleicht'],1]]},
+verw:{k:'seit (Zeit) und seid (ihr seid). wieder (nochmals) und wider (gegen). Stadt (Ort) und statt (anstatt). Der Satz entscheidet.',q:[['Ihr ___ pünktlich.',['seit','seid'],1],['Er kommt ___.',['wieder','wider'],0],['Er wohnt ___ drei Jahren hier.',['seid','seit'],1]]},
+br0:{k:'Zähler oben, Nenner unten. **Kürzen** = beide durch dieselbe Zahl teilen. **Erweitern** = beide mit derselben Zahl malnehmen. Der Wert bleibt gleich.',m:'Nenner = „nennt“ die Teile. Zähler = „zählt“ die Teile, die du hast.',q:[['Kürze 6/8.',['3/4','2/3','6/4','1/2'],0],['Erweitere 2/3 mit 4.',['6/7','8/12','8/3','2/12'],1],['Welcher Bruch ist am größten?',['3/8','1/2','2/5','1/3'],1]]},
+br1:{k:'Plus und Minus: Nenner müssen **gleich** sein. Erst auf einen Hauptnenner bringen, dann nur die Zähler rechnen.',m:'Nenner niemals addieren: 1/2 + 1/3 ist **nicht** 2/5.',q:[['1/2 + 1/3 = ?',['2/5','5/6','1/6','2/6'],1],['3/4 − 1/6 = ?',['7/12','2/10','5/6','1/2'],0],['2/7 + 3/7 = ?',['5/14','5/7','6/7','5/49'],1]]},
+br2:{k:'Mal: **oben mal oben, unten mal unten**. Vorher kürzen spart Arbeit. „von“ heißt mal.',q:[['2/3 · 4/5 = ?',['8/15','6/8','8/8','2/5'],0],['3/4 von 40 = ?',['10','30','3','36'],1]]},
+br3:{k:'Geteilt: **mal Kehrwert**. Den zweiten Bruch umdrehen, dann malnehmen.',m:'Teilen durch einen Bruch = mal den umgedrehten Bruch.',q:[['2/3 : 4/5 = ?',['8/15','5/6','6/5','10/9'],1],['Kehrwert von 3/7?',['7/3','3/7','−3/7','4/7'],0]]},
+br4:{k:'Gemischte Zahl: ganze Zahl + Bruch. Zu unechtem Bruch: ganze Zahl mal Nenner plus Zähler.',q:[['7/4 als gemischte Zahl?',['1 3/4','2 1/4','1 1/4','3 1/4'],0],['2 1/3 als unechter Bruch?',['7/3','6/3','5/3','21/3'],0]]},
+br5:{k:'Bruch → Dezimal: Zähler durch Nenner. Dezimal → Prozent: mal 100. Lerne: 1/2 = 50 %, 1/4 = 25 %, 3/4 = 75 %, 1/5 = 20 %, 1/8 = 12,5 %.',q:[['3/4 in Prozent?',['34 %','75 %','25 %','60 %'],1],['0,2 als Bruch?',['1/5','1/2','2/5','1/20'],0],['1/8 in Prozent?',['18 %','12,5 %','8 %','15 %'],1]]},
+pr:{k:'W = G · p / 100. **Grundwert** = das Ganze (100 %), **Prozentwert** = der Teil. 10 % = durch 10, 1 % = durch 100.',m:'G wie Ganzes, W wie Wert des Teils.',q:[['20 % von 150?',['20','30','25','300'],1],['80 Euro plus 25 %?',['100','105','120','85'],0],['Von 10 % auf 15 %: Der Anstieg ist …',['5 Prozentpunkte','5 Prozent','50 Prozentpunkte','15 %'],0]]},
+dre:{k:'Immer erst auf **eins** rechnen, dann auf das Ziel. Je mehr, desto mehr: erst teilen, dann mal. Je mehr, desto weniger: erst mal, dann teilen.',q:[['3 kg kosten 6 €. Was kosten 5 kg?',['10 €','12 €','9 €','15 €'],0],['4 Arbeiter brauchen 6 Tage. Wie lange brauchen 3 Arbeiter?',['8 Tage','4,5 Tage','6 Tage','12 Tage'],0]]},
+pot:{k:'a² = a · a. Wurzel ist die Umkehrung. Minus mal Minus = Plus. Quadratzahlen bis 15 auswendig: 1, 4, 9, 16, 25, 36, 49, 64, 81, 100, 121, 144, 169, 196, 225.',q:[['Wurzel aus 81 = ?',['9','8','18','7'],0],['(−3)² = ?',['9','−9','6','−6'],0],['2³ = ?',['6','8','9','5'],1]]},
+ein:{k:'Länge: ×1000 (km→m), ×100 (m→cm), ×10 (cm→mm). Zeit: 60 min = 1 h. km/h durch 3,6 = m/s.',q:[['72 km/h in m/s?',['20','25','15','72'],0],['2,5 km in m?',['250','2500','25','25000'],1]]},
+tempo:{k:'**s = v · t**. Weg gleich Tempo mal Zeit. Durchschnitt = Summe durch Anzahl. Median = mittlerer Wert der geordneten Reihe.',m:'Weg-Dreieck: Finger auf die gesuchte Größe, der Rest zeigt die Rechnung.',q:[['90 km/h für 2,5 h: Wie weit?',['180 km','225 km','200 km','36 km'],1],['Durchschnitt von 4, 7, 10?',['6','7','8','21'],1],['Median von 3, 9, 5, 1, 7?',['5','7','3','9'],0]]},
+regel:{k:'Klammern, dann Potenzen, dann **Punkt vor Strich**. 1 ist keine Primzahl. Durch 3 teilbar, wenn die Quersumme durch 3 teilbar ist.',q:[['3 + 4 · 2 = ?',['14','11','10','24'],1],['Welche Zahl ist eine Primzahl?',['21','27','29','33'],2],['Welche Zahl ist durch 3 teilbar?',['124','135','215','301'],1]]},
+zrr:{k:'Schreibe die **Abstände** auf. Gleich? Dann plus/minus. Wachsend? Dann Differenzen der Differenzen. Verdoppeln? Dann mal.',m:'Erst Abstände, dann Quotienten, dann zwei Reihen abwechselnd.',q:[['3, 7, 11, 15, …',['17','19','18','21'],1],['2, 6, 18, 54, …',['108','162','72','216'],1],['1, 2, 4, 7, 11, …',['15','16','17','18'],1]]}
+};
+const lxCol=x=>(LX[x.id]&&LX[x.id].c)||TOP[x.ti].c;
+/* ----- Bilder (SVG) ----- */
+const lxS=(w,h,b,al)=>`<svg class="lxs" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(al)}">${b}</svg>`;
+const lxT=(x,y,t,o)=>{o=o||{};return `<text x="${x}" y="${y}" text-anchor="${o.a||'middle'}" class="lxt${o.s?' lxsm':''}" style="${o.c?'fill:'+o.c+';':''}${o.z?'font-size:'+o.z+'px;':''}${o.w?'font-weight:'+o.w:''}">${esc(t)}</text>`;};
+const lxR=(x,y,w,h,f,o)=>{o=o||{};return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${o.r==null?10:o.r}" style="fill:${f};${o.s?'stroke:'+o.s+';stroke-width:'+(o.sw||2)+';':''}${o.op?'opacity:'+o.op:''}"/>`;};
+function lxChips(parts,al){
+  const gap=8,ws=parts.map(p=>Math.max(56,p[0].length*8.8+24)),tot=ws.reduce((a,b)=>a+b,0)+gap*(parts.length-1)+16;let x=8,o='';
+  parts.forEach((p,i)=>{const w=ws[i];o+=lxR(x,12,w,40,p[1],{r:12})+lxT(x+w/2,37,p[0],{c:'#fff',w:700,z:15})+(p[2]?lxT(x+w/2,72,p[2],{c:p[1],w:700,z:12}):'');x+=w+gap;});
+  return lxS(Math.max(tot,300),88,o,al);
+}
+function lxPie(cx,cy,r,n,d,col){
+  const pt=a=>[cx+r*Math.cos(a),cy+r*Math.sin(a)],A=i=>-Math.PI/2+2*Math.PI*i/d;
+  let s=`<circle cx="${cx}" cy="${cy}" r="${r}" style="fill:var(--card2)"/>`;
+  for(let i=0;i<n;i++){const [x1,y1]=pt(A(i)),[x2,y2]=pt(A(i+1));s+=`<path d="M${cx} ${cy}L${x1.toFixed(1)} ${y1.toFixed(1)}A${r} ${r} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}Z" style="fill:${col}"/>`;}
+  for(let i=0;i<d;i++){const [x,y]=pt(A(i));s+=`<line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" style="stroke:var(--ink2);stroke-width:1.5"/>`;}
+  return s+`<circle cx="${cx}" cy="${cy}" r="${r}" style="fill:none;stroke:var(--ink2);stroke-width:2"/>`;
+}
+function lxBar(x,y,w,h,n,d,col){
+  let s=lxR(x,y,w,h,'var(--card2)',{r:4});if(n)s+=lxR(x,y,w*n/d,h,col,{r:4});
+  for(let i=1;i<d;i++)s+=`<line x1="${x+w*i/d}" y1="${y}" x2="${x+w*i/d}" y2="${y+h}" style="stroke:var(--ink2);stroke-width:1.5"/>`;
+  return s+`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" style="fill:none;stroke:var(--ink2);stroke-width:2"/>`;
+}
+const FIG={
+fall0:()=>{const C=[['Nominativ','Wer oder was?','der Mann',BL],['Genitiv','Wessen?','des Mannes',PU],['Dativ','Wem?','dem Mann',GN],['Akkusativ','Wen oder was?','den Mann',RD]];let b='';C.forEach((c,i)=>{const x=8+(i%2)*166,y=8+Math.floor(i/2)*86;b+=lxR(x,y,158,78,c[3],{r:14})+lxT(x+79,y+25,c[0],{c:'#fff',w:700,z:16})+lxT(x+79,y+46,c[1],{c:'#fff',z:14})+lxT(x+79,y+66,c[2],{c:'#fff',w:700,z:14});});return lxS(340,186,b,'Die vier Fälle mit Frage und Beispiel');},
+nom:()=>lxChips([['Der Polizist',BL,'Wer?'],['kommt',GY,'tut'],['heute',GY,'wann?']],'Nominativ: Der Polizist kommt heute'),
+gen:()=>lxChips([['Das Auto',GY,'was?'],['des Nachbarn',PU,'Wessen?'],['steht dort',GY,'']],'Genitiv: Das Auto des Nachbarn'),
+dat:()=>lxChips([['Der Polizist',BL,'Wer?'],['hilft',GY,'tut'],['dem Mann',GN,'Wem?']],'Dativ: Der Polizist hilft dem Mann'),
+akk:()=>lxChips([['Der Polizist',BL,'Wer?'],['befragt',GY,'tut'],['den Zeugen',RD,'Wen?']],'Akkusativ: Der Polizist befragt den Zeugen'),
+wech:()=>{let b=lxR(6,6,160,128,'var(--card2)',{r:14})+lxR(174,6,160,128,'var(--card2)',{r:14});
+  b+=lxR(30,86,112,10,'#8C6A44',{r:3})+'<rect x="38" y="96" width="8" height="28" style="fill:#8C6A44"/><rect x="126" y="96" width="8" height="28" style="fill:#8C6A44"/>'+lxR(62,68,56,18,GN,{r:3})+lxT(86,30,'WO?',{c:GN,w:800,z:20})+lxT(86,50,'ruht auf dem Tisch',{z:12,s:1});
+  b+=lxR(198,86,112,10,'#8C6A44',{r:3})+'<rect x="206" y="96" width="8" height="28" style="fill:#8C6A44"/><rect x="294" y="96" width="8" height="28" style="fill:#8C6A44"/>'+lxR(186,28,44,16,RD,{r:3})+'<path d="M232 38Q262 30 258 78" style="fill:none;stroke:'+RD+';stroke-width:3"/><path d="M251 70L258 80L266 70" style="fill:none;stroke:'+RD+';stroke-width:3"/>'+lxT(254,22,'WOHIN?',{c:RD,w:800,z:20,a:'middle'})+lxT(254,132,'',{});
+  b+=lxT(86,128,'Dativ',{c:GN,w:700,z:14})+lxT(254,128,'Akkusativ',{c:RD,w:700,z:14});return lxS(340,142,b,'Wo: Dativ, Wohin: Akkusativ');},
+zeit0:()=>{let b='<line x1="14" y1="86" x2="386" y2="86" style="stroke:var(--ink2);stroke-width:3"/>';
+  [[50,'Plusquamperfekt','ich war gegangen',PU,-1],[120,'Perfekt / Präteritum','ich bin gegangen / ging',OR,1],[190,'Präsens','ich gehe',GN,-1],[260,'Futur I','ich werde gehen',BL,1],[330,'Futur II','ich werde gegangen sein',IN,-1]].forEach(([x,t,e,c,up])=>{b+=`<circle cx="${x}" cy="86" r="7" style="fill:${c}"/>`+lxT(x,up<0?56:118,t,{c,w:700,z:11})+lxT(x,up<0?71:133,e,{z:10,s:1});});
+  return lxS(400,170,b+lxT(50,160,'← Vergangenheit',{z:11,s:1})+lxT(190,160,'jetzt',{z:11,s:1,w:700})+lxT(340,160,'Zukunft →',{z:11,s:1}),'Zeitstrahl mit den sechs Zeitformen');},
+praes:()=>lxChips([['Er',GY,''],['geht',GN,'Präsens'],['nach Hause',GY,'']],'Präsens'),
+praet:()=>lxChips([['Er',GY,''],['ging',OR,'Präteritum'],['nach Hause',GY,'']],'Präteritum'),
+perf:()=>lxChips([['Ich',GY,''],['habe',OR,'haben / sein'],['den Bericht',GY,''],['geschrieben',BL,'Partizip II']],'Perfekt: Klammer aus Hilfsverb und Partizip'),
+plus:()=>lxChips([['Er',GY,''],['hatte',PU,'hatte / war'],['gegessen',BL,'Partizip II']],'Plusquamperfekt'),
+fut1:()=>lxChips([['Ich',GY,''],['werde',BL,'werden'],['morgen',GY,''],['lernen',GN,'Infinitiv']],'Futur I'),
+fut2:()=>lxChips([['Ich',GY,''],['werde',BL,'werden'],['den Bericht',GY,''],['geschrieben',IN,'Partizip II'],['haben',OR,'haben / sein']],'Futur II'),
+st0:()=>{let b='';[['schnell','Positiv',50,GY],['schneller','Komparativ',90,OR],['am schnellsten','Superlativ',130,RD]].forEach(([t,s,h,c],i)=>{const x=10+i*112;b+=lxR(x,150-h,104,h,c,{r:10})+lxT(x+52,150-h+24,t,{c:'#fff',w:700,z:13})+lxT(x+52,150-h+42,s,{c:'#fff',z:11});});return lxS(340,160,b,'Drei Stufen der Steigerung');},
+st1:()=>lxChips([['gut',GY,'Positiv'],['besser',OR,'Komparativ'],['am besten',RD,'Superlativ']],'gut, besser, am besten'),
+st2:()=>lxChips([['so groß',GY,''],['wie',GN,'gleich'],['größer',OR,''],['als',RD,'ungleich']],'so wie, als'),
+satz:()=>lxChips([['Heute',BL,'Platz 1'],['kommt',RD,'Platz 2: Verb'],['der Polizist',GY,'Platz 3']],'Hauptsatz: Verb an zweiter Stelle'),
+pass:()=>lxChips([['Der Mann',BL,'Subjekt'],['wird',OR,'werden'],['verhaftet',RD,'Partizip II']],'Passiv'),
+konj:()=>lxChips([['Wenn ich Zeit hätte,',GY,'Bedingung'],['würde ich',PU,'Konjunktiv II'],['kommen',GN,'Infinitiv']],'Konjunktiv II'),
+das:()=>lxChips([['Das Auto,',GY,''],['das',BL,'= welches'],['dort steht',GY,'']],'das mit s: ersetzbar durch welches'),
+br0:()=>lxS(340,176,lxPie(70,80,56,3,4,GN)+lxT(70,160,'3/4',{w:700,z:16})+lxT(170,92,'=',{w:800,z:30})+lxPie(270,80,56,6,8,GN)+lxT(270,160,'6/8',{w:700,z:16}),'3/4 und 6/8 sind gleich viel'),
+br1:()=>{let b='';[['1/2 = 3/6',3,6,GN],['1/3 = 2/6',2,6,OR],['zusammen 5/6',5,6,PU]].forEach((r,i)=>{b+=lxT(8,34+i*52,r[0],{a:'start',w:700,z:14})+lxBar(130,16+i*52,200,28,r[1],r[2],r[3]);});return lxS(340,160,b,'1/2 + 1/3 = 5/6 mit Sechsteln');},
+br2:()=>{let b='';for(let r=0;r<3;r++)for(let c=0;c<5;c++){const a=c<4,e=r<2;b+=lxR(20+c*40,14+r*36,38,34,a&&e?PU:a?GN:e?OR:'var(--card2)',{r:4,op:a&&e?1:.5});}
+  return lxS(340,132,b+lxT(240,44,'4/5 breit',{a:'start',c:GN,w:700,z:13})+lxT(240,66,'2/3 hoch',{a:'start',c:OR,w:700,z:13})+lxT(240,94,'8 von 15',{a:'start',c:PU,w:700,z:15})+lxT(240,114,'= 2/3 · 4/5',{a:'start',z:12,s:1}),'Flächenbild: 2/3 mal 4/5 ist 8/15');},
+br3:()=>lxS(340,150,lxBar(20,16,300,36,3,4,GN)+lxT(170,76,'3 Viertel ÷ 3 = 1 Viertel',{w:700,z:14})+lxT(170,106,'Durch einen Bruch teilen:',{z:12,s:1})+lxT(170,128,'2/3 : 4/5 = 2/3 · 5/4 (Kehrwert)',{w:700,z:14,c:PU}),'Teilen und Kehrwert'),
+br4:()=>lxS(340,150,lxPie(70,66,50,4,4,GN)+lxPie(190,66,50,3,4,GN)+lxT(130,76,'+',{w:800,z:26})+lxT(270,76,'=',{w:800,z:26})+lxT(305,82,'7/4',{w:800,z:18,c:GN})+lxT(130,140,'1 + 3/4 = 1 3/4',{w:700,z:14}),'7/4 sind eine ganze Pizza und 3/4'),
+br5:()=>{let b='<line x1="30" y1="60" x2="310" y2="60" style="stroke:var(--ink2);stroke-width:3"/>';[['0','0',''],['1/4','0,25','25 %'],['1/2','0,5','50 %'],['3/4','0,75','75 %'],['1','1','100 %']].forEach(([f,d,p],i)=>{const x=30+i*70;b+=`<circle cx="${x}" cy="60" r="6" style="fill:${GN}"/>`+lxT(x,38,f,{w:800,z:15})+lxT(x,84,d,{z:13,s:1})+(p?lxT(x,104,p,{z:13,w:700,c:GN}):lxT(x,104,'0 %',{z:13,w:700,c:GN}));});return lxS(340,116,b,'Zahlenstrahl: Bruch, Dezimal, Prozent');},
+pr:()=>lxS(340,126,lxT(14,20,'100 % = Grundwert (150)',{a:'start',z:12,s:1})+lxBar(14,28,312,34,2,10,OR)+lxT(14,86,'20 % = Prozentwert (30)',{a:'start',z:14,c:OR,w:700})+lxT(14,110,'10 % = 150 : 10 = 15, also 20 % = 30',{a:'start',z:12,s:1}),'Prozentbalken'),
+dre:()=>{let b='';[['3 kg → 6 €',8],['1 kg → 2 €',70],['5 kg → 10 €',132]].forEach(([t,y],i)=>{b+=lxR(90,y-6,160,38,i===1?OR:GY,{r:10})+lxT(170,y+19,t,{c:'#fff',w:700,z:15});});
+  b+=lxT(80,60,'÷ 3',{a:'end',w:800,z:16,c:OR})+lxT(80,122,'· 5',{a:'end',w:800,z:16,c:OR})+'<path d="M170 32L170 62M164 56L170 64L176 56" style="fill:none;stroke:var(--ink2);stroke-width:2.5"/><path d="M170 94L170 124M164 118L170 126L176 118" style="fill:none;stroke:var(--ink2);stroke-width:2.5"/>';return lxS(340,176,b,'Dreisatz: auf eins, dann auf das Ziel');},
+pot:()=>{let b='';for(let r=0;r<3;r++)for(let c=0;c<3;c++)b+=lxR(30+c*40,14+r*40,36,36,GN,{r:5});return lxS(340,140,b+lxT(240,56,'3² = 3 · 3',{a:'start',w:700,z:16})+lxT(240,82,'= 9',{a:'start',w:800,z:20,c:GN})+lxT(240,110,'Wurzel aus 9 = 3',{a:'start',z:12,s:1}),'3 mal 3 Quadrate');},
+ein:()=>lxChips([['km',BL,'× 1000 →'],['m',GN,'× 100 →'],['cm',OR,'× 10 →'],['mm',RD,'']],'Längenleiter: km, m, cm, mm'),
+tempo:()=>lxS(340,170,'<path d="M170 12L58 152L282 152Z" style="fill:var(--card2);stroke:var(--ink2);stroke-width:3"/><line x1="94" y1="104" x2="246" y2="104" style="stroke:var(--ink2);stroke-width:3"/><line x1="170" y1="104" x2="170" y2="152" style="stroke:var(--ink2);stroke-width:3"/>'+lxT(170,84,'s (Weg)',{w:800,z:17,c:OR})+lxT(118,136,'v',{w:800,z:19,c:BL})+lxT(222,136,'t',{w:800,z:19,c:GN}),'Weg-Dreieck: s oben, v und t unten'),
+zrr:()=>{let b='';[3,7,11,15,19].forEach((n,i)=>{const x=34+i*68;b+=`<circle cx="${x}" cy="64" r="22" style="fill:${GN}"/>`+lxT(x,70,String(n),{c:'#fff',w:700,z:17});if(i<4)b+=`<path d="M${x+14} 40Q${x+34} 16 ${x+54} 40" style="fill:none;stroke:var(--ink2);stroke-width:2"/>`+lxT(x+34,20,'+4',{c:OR,w:800,z:14});});return lxS(340,100,b,'Zahlenreihe mit gleichem Abstand +4');}
+};
+/* ----- Selbsttest ----- */
+let LQ=null;
+const lxShuf=a=>{const r=a.slice();for(let i=r.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[r[i],r[j]]=[r[j],r[i]];}return r;};
+function lxQStart(key,ids,n){
+  let L=[];ids.forEach(id=>((LX[id]&&LX[id].q)||[]).forEach(q=>{const sh=lxShuf(q[1].map((t,i)=>[t,i===q[2]]));L.push({id,q:q[0],o:sh.map(x=>x[0]),a:sh.findIndex(x=>x[1])});}));
+  L=lxShuf(L);if(n)L=L.slice(0,n);LQ={key,list:L,i:0,score:0,sel:null,done:false};
+}
+function lxQView(){
+  const Q=LQ;
+  if(Q.done){const n=Q.list.length,p=Q.score/n;const msg=p===1?'Perfekt! Das sitzt.':p>=.7?'Gut! Schau dir die Fehler noch einmal an.':'Noch nicht sicher. Lies die Seite noch einmal und teste dich dann erneut.';
+    return `<b>Ergebnis: ${Q.score} von ${n}</b><p class="sub" style="margin:4px 0 10px">${msg}</p><div class="row" style="margin:0"><button class="btn" data-act="lexqr">Nochmal testen</button></div>`;}
+  const q=Q.list[Q.i],ans=Q.sel!=null;
+  return `<div class="prog"><span>Frage ${Q.i+1} von ${Q.list.length}</span><span class="bar"><i style="width:${Math.round(100*Q.i/Q.list.length)}%"></i></span></div><div class="q" style="font-size:18px;margin:6px 0 10px">${esc(q.q)}</div>`+
+  q.o.map((o,i)=>`<button class="opt ${ans?(i===q.a?'ok':(i===Q.sel?'bad':'')):''}" data-act="lexa" data-i="${i}" ${ans?'disabled':''}>${esc(o)}${ans&&i===q.a?'<span class="mk">✓</span>':ans&&i===Q.sel?'<span class="mk">✗</span>':''}</button>`).join('')+
+  (ans?`<p class="verdict ${Q.sel===q.a?'ok':'bad'}">${Q.sel===q.a?'Richtig!':'Richtig ist: '+esc(q.o[q.a])}</p><div class="row" style="margin:6px 0 0"><button class="btn" data-act="lexn">${Q.i+1>=Q.list.length?'Ergebnis':'Weiter'}</button></div>`:'');
+}
+function lxQBlock(key,id){
+  if(LQ&&LQ.key===key)return `<div class="card" id="lxq"><div class="sec" style="margin:0 0 6px">Selbsttest</div>${lxQView()}</div>`;
+  const n=((LX[id]&&LX[id].q)||[]).length;if(!n)return '';const b=(ST.lexq||{})[key];
+  return `<div class="card"><b>Selbsttest</b><p class="sub small" style="margin:4px 0 10px">${n} Fragen. Dich selbst abzufragen bleibt viel besser hängen als nur Lesen.${b?` Bestes Ergebnis: ${b.s} von ${b.n}.`:''}</p><button class="btn" data-act="lexqs" data-id="${id}">Test starten</button></div>`;
+}
+/* ----- Ansichten ----- */
+const lexMk=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+const lexReadN=()=>LEX_ALL.filter(x=>(ST.lexr||{})[x.id]).length;
+const lexTopRead=ti=>LEX[ti].items.filter(x=>(ST.lexr||{})[x.id]).length;
+function lexNext(){return LEX_ALL.find(x=>!(ST.lexr||{})[x.id]);}
+V7.lex=function(){
+  const n=LEX_ALL.length,r=lexReadN(),nx=lexNext();
+  let h=`<h1 class="lt">Wissen</h1><p class="sub" style="margin-top:2px">Regeln einfach erklärt, mit Bildern, Merkhilfen und Selbsttest.</p><div class="lxprog" aria-hidden="true"><i style="width:${Math.round(100*r/n)}%"></i></div><p class="sub small" style="margin:0 0 6px">${r} von ${n} Seiten gelesen</p>`;
+  if(nx)h+=`<button class="btn" style="width:100%;margin:6px 0" data-act="lexo" data-id="${nx.id}">${r?'Weiterlernen':'Starten'}: ${esc(nx.t)}</button>`;
+  h+=`<div class="lxgrid">`+TOP.map((t,i)=>`<button class="lxc" style="--c:${t.c}" data-act="lext" data-k="${t.k}"><span class="e" aria-hidden="true">${t.e}</span><span><b>${esc(t.t)}</b><br><small>${lexTopRead(i)} von ${LEX[i].items.length} gelesen</small></span></button>`).join('')+`</div>`;
+  return h;
+};
+V7.lext=function(){
+  const ti=TOPK[viewArg];if(ti==null)return V7.lex();
+  const T=TOP[ti],G=LEX[ti];
+  let h=`<button class="back" data-act="lexb">Wissen</button><div class="lxhero" style="--c:${T.c}"><div class="e" aria-hidden="true">${T.e}</div><h1>${esc(T.t)}</h1><p>${esc(T.lead)}</p></div>`;
+  if(T.cheat)h+=`<div class="card"><div class="sec" style="margin:0 0 6px">Auf einen Blick</div>${T.cheat.map(c=>`<div class="lxch" style="--c:${c[2]}"><i></i><div><b>${esc(c[0])}</b><span>${esc(c[1])}</span></div></div>`).join('')}</div>`;
+  h+=`<div class="sec" style="margin:14px 4px 4px">Seiten (${lexTopRead(ti)} von ${G.items.length} gelesen)</div>`;
+  h+=G.items.map(x=>{const b=(ST.lexq||{})['p:'+x.id],rd=(ST.lexr||{})[x.id];return `<button class="lxrow" style="--c:${lxCol(x)}" data-act="lexo" data-id="${x.id}"><span class="t"><b>${esc(x.t)}</b><span class="d">${esc(x.d)}</span></span><span class="r">${rd?'✓':''}${b?' '+b.s+'/'+b.n:''}</span></button>`;}).join('');
+  if(G.items.some(x=>LX[x.id]&&LX[x.id].q))h+=`<div class="row"><button class="btn alt" data-act="lexqt" data-k="${T.k}">Thema-Test (8 gemischte Fragen)</button></div>`;
+  return h;
+};
+V7.lexq=function(){
+  const ti=TOPK[viewArg];if(ti==null)return V7.lex();const T=TOP[ti];
+  if(!LQ||LQ.key!=='t:'+T.k)lxQStart('t:'+T.k,LEX[ti].items.map(x=>x.id),8);
+  return `<button class="back" data-act="lext" data-k="${T.k}">${esc(T.t)}</button><h1 class="lt">Thema-Test</h1><div class="card" id="lxq">${lxQView()}</div>`;
+};
+V7.lexp=function(){
+  const x=LEXI[viewArg];if(!x)return V7.lex();
+  const T=TOP[x.ti],E=LX[x.id]||{},L=LEX[x.ti].items,i=L.indexOf(x),read=!!(ST.lexr||{})[x.id],col=lxCol(x);
+  const min=Math.max(1,Math.round(x.b.join(' ').split(/\s+/).length/170));
+  return `<button class="back" data-act="lexbt">${esc(T.t)}</button>
+  <div class="lxhero" style="--c:${col}"><div class="e" aria-hidden="true">${T.e}</div><h1>${esc(x.t)}</h1><p>${esc(x.d)} · ca. ${min} Min${read?' · ✓ gelesen':''}</p></div>
+  ${E.k?`<div class="lxk" style="--c:${col}"><span class="lxl">In 30 Sekunden</span>${lexMk(E.k)}</div>`:''}
+  ${FIG[x.id]?`<div class="card" style="padding:8px 10px">${FIG[x.id]()}</div>`:''}
+  <div class="row" style="margin:10px 0"><button class="btn alt sm" data-act="lexsay">Vorlesen</button><button class="btn alt sm" data-act="practice" data-id="${x.cat}">Dazu üben</button></div>
+  <div class="card">${lexBody(x.b)}</div>
+  ${E.m?`<div class="lxmerk"><b>🧠 Eselsbrücke</b><br>${lexMk(E.m)}</div>`:''}
+  ${lxQBlock('p:'+x.id,x.id)}
+  <div class="row"><button class="btn ${read?'alt':''}" data-act="lexread">${read?'✓ Gelesen (zurücknehmen)':'Als gelesen markieren'}</button></div>
+  <div class="qnav" style="margin-top:6px">${i>0?`<button class="btn alt sm" data-act="lexo" data-id="${L[i-1].id}">‹ ${esc(L[i-1].t)}</button>`:''}${i<L.length-1?`<button class="btn alt sm" data-act="lexo" data-id="${L[i+1].id}">${esc(L[i+1].t)} ›</button>`:''}</div>`;
+};
+function lexSpeech(x){
+  const E=LX[x.id]||{},parts=[x.t+'.'];if(E.k)parts.push('In 30 Sekunden: '+E.k.replace(/\*\*/g,'')+'.'.replace(/^\.$/,''));
+  let hdr=null;
+  for(const l of x.b){
+    if(l.startsWith('|')){const c=l.split('|').slice(1,-1).map(s=>s.trim());if(hdr===null){hdr=c;continue;}parts.push(c.map((v,i)=>(hdr&&hdr.length>2&&i>0?hdr[i]+': ':'')+v).join(', ')+'.');continue;}
+    hdr=null;let t=l.replace(/^(#|>|•|ex:)\s*/,'').replace(/\*\*/g,'');if(!/[.!?:]$/.test(t))t+='.';parts.push(t);
+  }
+  if(E.m)parts.push('Eselsbrücke: '+E.m.replace(/\*\*/g,''));
+  return parts;
+}
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-act^="lex"]');if(!b)return;const a=b.dataset.act;
+  const keep=()=>{const q=document.getElementById('lxq');if(q&&q.scrollIntoView)q.scrollIntoView({block:'nearest'});};
+  if(a==='lexo')go('lexp',b.dataset.id);
+  else if(a==='lext')go('lext',b.dataset.k);
+  else if(a==='lexb')go('lex');
+  else if(a==='lexbt'){const x=LEXI[viewArg];go('lext',x?TOP[x.ti].k:null);}
+  else if(a==='lexread'){ST.lexr=ST.lexr||{};const id=viewArg;if(ST.lexr[id])delete ST.lexr[id];else ST.lexr[id]=Date.now();save();render();}
+  else if(a==='lexqs'){lxQStart('p:'+b.dataset.id,[b.dataset.id]);render();keep();}
+  else if(a==='lexqt'){LQ=null;go('lexq',b.dataset.k);}
+  else if(a==='lexqr'){const k=LQ.key;if(k==='due'){LQ=null;go('lexd');return;}if(k.startsWith('p:'))lxQStart(k,[k.slice(2)]);else{const t=TOPK[k.slice(2)];lxQStart(k,LEX[t].items.map(x=>x.id),8);}render();keep();}
+  else if(a==='lexa'){if(!LQ||LQ.sel!=null)return;const i=+b.dataset.i;LQ.sel=i;if(i===LQ.list[LQ.i].a)LQ.score++;if(ST.set&&ST.set.hapt)haptic(i===LQ.list[LQ.i].a?1:2);render();keep();}
+  else if(a==='lexn'){if(!LQ)return;LQ.i++;LQ.sel=null;
+    if(LQ.i>=LQ.list.length){LQ.done=true;ST.lexq=ST.lexq||{};const o=ST.lexq[LQ.key];if(!o||LQ.score/LQ.list.length>=o.s/o.n)ST.lexq[LQ.key]={s:LQ.score,n:LQ.list.length};
+      if(LQ.key.startsWith('p:')){ST.lexr=ST.lexr||{};if(!ST.lexr[LQ.key.slice(2)])ST.lexr[LQ.key.slice(2)]=Date.now();}save();}
+    render();keep();}
+  else if(a==='lexsay'){
+    if(TT.on){ttsStop();b.textContent='Vorlesen';return;}
+    const x=LEXI[viewArg];if(!x)return;
+    if(speakList(lexSpeech(x),{onEnd:()=>{ttsStop();const e=document.querySelector('[data-act="lexsay"]');if(e)e.textContent='Vorlesen';}}))b.textContent='Stopp';else b.textContent='Kein Ton verfügbar';
+  }
+  else if(a==='lexgo'){const id=b.dataset.id;leaveSession();go('lexp',id);}
+});
+/* Regel zur falschen Antwort anzeigen */
+const LEXR=[[/wechselpräp/i,'wech'],[/dativ|\bwem\b/i,'dat'],[/akkusativ|wen oder was/i,'akk'],[/genitiv|wessen/i,'gen'],[/nominativ/i,'nom'],[/plusquam/i,'plus'],[/präteritum|imperfekt/i,'praet'],[/futur ?(ii|2)/i,'fut2'],[/futur/i,'fut1'],[/präsens/i,'praes'],[/perfekt/i,'perf'],[/steiger|komparativ|superlativ/i,'st0'],[/das oder dass|das\/dass|\bdass\b/i,'das'],[/\bß\b|scharfes s/i,'ss'],[/komma/i,'komma'],[/großschreib|kleinschreib|groß- und klein/i,'gk'],[/passiv/i,'pass'],[/konjunktiv/i,'konj'],[/wortart/i,'wa'],[/bruch|brüche|kürzen|erweitern/i,'br0'],[/prozent/i,'pr'],[/dreisatz/i,'dre'],[/potenz|wurzel|quadrat/i,'pot'],[/tempo|geschwindigkeit|durchschnitt/i,'tempo']];
+function lexFor(q){
+  if(!q||!q.cat)return null;if(q.cat==='zr')return 'zrr';if(!['gr','rs','ma'].includes(q.cat))return null;
+  const t=[tagOf(q),q.q,q.e||''].join(' ');for(const [r,id] of LEXR)if(r.test(t))return id;return null;
+}
+const _viewStep8=viewStep;
+viewStep=function(){
+  let h=_viewStep8();
+  try{const st=S&&S.steps[S.i];if(st&&st.k==='q'&&S.cur&&!S.cur.ok&&!fastMode()){const id=lexFor(st.q);if(id&&LEXI[id]&&LX[id]&&LX[id].k)h+=`<div class="card lxk" style="--c:${lxCol(LEXI[id])}"><span class="lxl">Regel dazu</span><strong>${esc(LEXI[id].t)}</strong><br>${lexMk(LX[id].k)}<div class="row" style="margin:8px 0 0"><button class="btn alt sm" data-act="lexgo" data-id="${id}">Ganze Seite ansehen (beendet die Runde)</button></div></div>`;}}catch(e){}
+  return h;
+};
+/* Navigation: neuer Reiter Wissen */
+function renderNav(){
+  const tab=S?null:({home:'home',learn:'learn',cat:'home',exam:'learn',rep:'learn',themen:'learn',marked:'learn',kartei:'learn',karten:'learn',more:'more',stats:'more',backup:'more',settings:'more',info:'more',interview:'home',ablauf:'home',analyse:'more',rhythmus:'more',woche:'more',methoden:'more',lex:'lex',lext:'lex',lexp:'lex',lexq:'lex',lexd:'lex',notizen:'more',suche:'more',fragenstand:'more',diktat:'learn',profil:'more'})[view];
+  if(S){$nav.style.display='none';document.querySelector('.wrap').classList.add('nonav');return;}
+  $nav.style.display='flex';document.querySelector('.wrap').classList.remove('nonav');
+  const NI={home:'<svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>',learn:'<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 01-14.3 4.9M4 12A8 8 0 0118.3 7.1"/><path d="M18.5 3v4.3h-4.3M5.5 21v-4.3h4.3"/></svg>',lex:'<svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 012-2h6v16H6a2 2 0 00-2 2z"/><path d="M20 5a2 2 0 00-2-2h-6v16h6a2 2 0 012 2z"/></svg>',more:ICON.more};
+  $nav.innerHTML=[['home','Lernweg'],['learn','Üben'],['lex','Wissen'],['more','Mehr']].map(([id,l])=>`<button data-go="${id}" class="${tab===id?'on':''}" ${tab===id?'aria-current="page"':''}>${NI[id]}<span>${l}</span></button>`).join('');
+}
+Object.assign(VT,{lex:'Wissen',lext:'Wissen',lexp:'Wissen',lexq:'Wissen'});
+const _viewMore7=viewMore;
+viewMore=function(){return _viewMore7().replace('<div class="sec">Lernen</div><div class="list">','<div class="sec">Lernen</div><div class="list">'+li('data-go="lex"',IC.info,'Wissen','Fälle, Zeiten, Steigerung, Bruchrechnen und mehr',' ','c4'));};
+const _viewLearn7=viewLearn;
+viewLearn=function(){const h=_viewLearn7(),add=bigCard('data-go="lex"','Wissen','Fälle, Zeiten, Brüche und mehr erklärt','g3');const k=h.indexOf('<div class="grid2">');return k>=0?h.slice(0,k)+add+h.slice(k):h+add;};
+
+/* Aussprache: Brüche und Rechenzeichen */
+const _speechClean7=speechClean;
+speechClean=function(t){
+  const N={1:'ein',2:'zwei',3:'drei',4:'vier',5:'fünf',6:'sechs',7:'sieben',8:'acht',9:'neun',10:'zehn'};
+  const D={2:'Halbe',3:'Drittel',4:'Viertel',5:'Fünftel',6:'Sechstel',7:'Siebtel',8:'Achtel',9:'Neuntel',10:'Zehntel'};
+  let s=String(t).replace(/\b(\d{1,2})\/(\d{1,2})\b/g,(m,a,b)=>(N[+a]&&D[+b])?(+a===1&&+b===2?'ein halb':N[+a]+' '+D[+b]):m);
+  s=s.replace(/\s·\s/g,' mal ').replace(/\s:\s/g,' geteilt durch ').replace(/\s\+\s/g,' plus ').replace(/\s−\s/g,' minus ').replace(/\s=\s/g,' gleich ').replace(/√/g,'Wurzel aus ').replace(/²/g,' hoch zwei').replace(/³/g,' hoch drei').replace(/(\d),(\d)/g,'$1 Komma $2');
+  return _speechClean7(s);
+};
+
+/* ===================== Version 8: Stimme (flüssig, weiblich/männlich), Fehlerbuch, Bilder merken, Eselsbrücken, Wiederholung ===================== */
+(function(){const st=document.createElement('style');st.textContent=`
+.nw{background:none;border:0;padding:3px 4px;margin:1px 0;border-radius:6px;font:inherit;color:inherit;cursor:pointer;min-height:32px}
+.nw.on,.nbm{background:#FFE066;color:#000;border-radius:5px;padding:0 3px}
+.nwbox{background:var(--card);border-radius:10px;padding:8px 10px;margin:6px 0;line-height:1.9;white-space:pre-wrap}
+.nbsel{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.nbsel select{flex:1 1 140px;min-width:0}
+.bimg{font-size:46px;line-height:1.1;text-align:center}.bimg small{display:block;font-size:12px;color:var(--mute);font-weight:500}
+`;document.head.appendChild(st);})();
+/* ---------- Stimme: Geschlecht wählbar, flüssiges Sprechen ---------- */
+const VFEM=/anna|helena|petra|marlene|vicki|sabine|katja|hedda|amala|seraphina|kathrin|steffi|linda|monika|eva|kerstin|ramona|birgit|female|weiblich/i;
+const VMAL=/markus|yannick|viktor|martin|stefan|conrad|florian|killian|jonas|bernd|hans|klaus|thorsten|matthias|\bmale\b|männlich/i;
+function voiceGender(v){const n=v.name||'';return VFEM.test(n)?'f':(VMAL.test(n)?'m':'?');}
+bestVoice=function(){
+  if(ST.voice){const v=VOICES.find(x=>x.voiceURI===ST.voice);if(v)return v;}
+  const all=VOICES.slice().sort((a,b)=>voiceScore(b)-voiceScore(a));
+  const g=ST.vg||'';if(g==='f'||g==='m'){const m=all.filter(v=>voiceGender(v)===g);if(m.length)return m[0];}
+  return all[0]||null;
+};
+function ttsSplit(t){
+  const out=[];String(t).split(/(?<=[.!?…])\s+/).forEach(s=>{s=s.trim();if(!s)return;
+    while(s.length>260){let k=s.lastIndexOf(', ',220);if(k<80)k=s.lastIndexOf(' ',220);if(k<80)break;out.push(s.slice(0,k+1).trim());s=s.slice(k+1).trim();}
+    out.push(s);});
+  return out;
+}
+speakList=function(parts,opt){
+  opt=opt||{};if(!ttsOK()||!parts.length)return false;
+  try{
+    if(speechSynthesis.speaking||speechSynthesis.pending)speechSynthesis.cancel();
+    if(speechSynthesis.paused)speechSynthesis.resume();
+    const v=bestVoice();TT.on=true;const my=++SPK;const rate=opt.rate||ttsRate();
+    const jobs=[];parts.forEach((p,i)=>ttsSplit(speechClean(p)).forEach(t=>jobs.push({t,part:i})));
+    if(!jobs.length){TT.on=false;return false;}
+    jobs.forEach((j,n)=>{
+      const u=new SpeechSynthesisUtterance(j.t);u.lang=v?v.lang:'de-AT';if(v)u.voice=v;u.rate=rate;u.pitch=1;u.volume=1;
+      u.onstart=()=>{if(my===SPK&&opt.onPart)opt.onPart(j.part);};
+      if(n===jobs.length-1){
+        u.onend=()=>{if(my===SPK){TT.on=false;if(opt.onEnd)opt.onEnd();}};
+        u.onerror=e=>{if(my===SPK&&!(e&&(e.error==='canceled'||e.error==='interrupted'))){TT.on=false;if(opt.onEnd)opt.onEnd();}};
+      }
+      speechSynthesis.speak(u);
+    });
+    return true;
+  }catch(e){TT.on=false;return false;}
+};
+ttsCard=function(){
+  if(!ttsOK())return `<div class="card"><b>Vorlesen</b><p class="sub small" style="margin:4px 0 0">Dieser Browser hat keine Sprachausgabe.</p></div>`;
+  const cur=bestVoice(),lvl=voiceLevel(cur),g=ST.vg||'';
+  const opts=VOICES.slice().sort((a,b)=>voiceScore(b)-voiceScore(a)).map(v=>{const gg=voiceGender(v);return `<option value="${esc(v.voiceURI)}" ${cur&&cur.voiceURI===v.voiceURI?'selected':''}>${esc(v.name)} · ${gg==='f'?'weiblich':gg==='m'?'männlich':'?'} · ${voiceLevel(v)}</option>`;}).join('');
+  return `<div class="card"><b>Vorlesen und Diktat</b><p class="sub small" style="margin:2px 0 8px">Die App nutzt die beste deutsche Stimme deines Geräts und spricht zusammenhängend, ohne Pausen zwischen Satzteilen.</p>
+  <div class="sub small" style="margin:6px 0 4px">Stimme</div><div class="seg">${[['','Automatisch'],['f','Weiblich'],['m','Männlich']].map(([k,l])=>`<button data-act="vgen" data-v="${k}" class="${g===k?'on':''}">${l}</button>`).join('')}</div>
+  ${VOICES.length?`<label class="sub small" for="voicesel" style="display:block;margin-top:10px">Genau diese Stimme</label><select class="pick" id="voicesel" style="margin-top:4px">${opts}</select>
+  ${lvl==='Standard'?`<div class="warnbox">Deine beste Stimme ist nur „Standard“ und klingt deshalb nach Computer. Lade eine <b>Premium</b>- oder <b>Erweitert</b>-Stimme (Anleitung unten).</div>`:`<p class="sub small" style="margin:6px 0 0">Aktuell: ${esc(cur.name)} (${lvl}).</p>`}`:'<p class="sub small">Stimmen werden geladen … Tippe auf „Probe hören“.</p>'}
+  <div class="sub small" style="margin:10px 0 4px">Tempo</div><div class="seg">${[[.8,'Langsam'],[.92,'Normal'],[1.05,'Schnell']].map(([k,l])=>`<button data-act="rate" data-v="${k}" class="${Math.abs(ttsRate()-k)<.04?'on':''}">${l}</button>`).join('')}</div>
+  <div class="row" style="margin:10px 0 0"><button class="btn alt sm" data-act="ttsprobe">Probe hören</button><button class="btn alt sm" data-act="vcmp">Stimmen vergleichen</button></div>
+  <p class="sub small" style="margin:8px 0 0"><b>Natürlichere Stimme am iPhone:</b> Einstellungen → Bedienungshilfen → Gesprochene Inhalte → Stimmen → Deutsch → eine Stimme mit „Premium“ oder „Erweitert“ laden (weiblich z. B. Anna oder Petra, männlich z. B. Markus oder Yannick). Danach die App neu öffnen. Mehr als die Stimmen deines Geräts kann eine Webseite offline nicht nutzen.</p></div>`;
+};
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act="vgen"]');if(!b)return;ST.vg=b.dataset.v;ST.voice=null;save();loadVoices();render();speakList(['Guten Tag. So klinge ich beim Vorlesen. Ich spreche ruhig und zusammenhängend.']);});
+/* ---------- Bilder merken (Merkfähigkeit) ---------- */
+const BILD=[['🍎','Apfel'],['🚗','Auto'],['🏠','Haus'],['🌳','Baum'],['⚽','Ball'],['🔑','Schlüssel'],['☂️','Schirm'],['📱','Handy'],['✈️','Flugzeug'],['🐶','Hund'],['🐱','Katze'],['🚲','Fahrrad'],['⏰','Wecker'],['📚','Bücher'],['🎸','Gitarre'],['🍕','Pizza'],['⚓','Anker'],['🔔','Glocke'],['🌙','Mond'],['⭐','Stern'],['🚒','Feuerwehr'],['🚓','Polizeiauto'],['🧢','Kappe'],['🕶️','Sonnenbrille']];
+const bl=b=>`${b[0]} ${b[1]}`;
+function genBild(lv){
+  const n=lv===1?6:(lv===2?8:10),secs=lv===1?15:(lv===2?18:22);
+  const pool=shuffle(BILD.slice()),list=pool.slice(0,n),rest=pool.slice(n);
+  const a=pick(list),b=pick(rest),c=list[0],last=list[n-1];
+  const memo=`<div style="grid-column:1/-1;display:grid;grid-template-columns:repeat(${n<=6?3:4},1fr);gap:10px">${list.map(x=>`<div class="bimg">${x[0]}<small>${x[1]}</small></div>`).join('')}</div>`;
+  const qs=[
+    MC('me',lv,'Welches Bild war dabei?',bl(a),shuffle(rest).slice(0,3).map(bl),`${bl(a)} war unter den Bildern.`),
+    MC('me',lv,'Welches Bild war NICHT dabei?',bl(b),shuffle(list).slice(0,3).map(bl),`${bl(b)} war nicht dabei.`),
+    NUM('me',lv,'Wie viele Bilder waren es?',n,`Es waren ${n} Bilder.`),
+    MC('me',lv,'Welches Bild stand ganz oben links (an erster Stelle)?',bl(c),shuffle(list.slice(1)).slice(0,3).map(bl),`Zuerst kam ${bl(c)}.`),
+    MC('me',lv,'Welches Bild stand an letzter Stelle?',bl(last),shuffle(list.slice(0,n-1)).slice(0,3).map(bl),`Zuletzt kam ${bl(last)}.`)];
+  return{memo,secs,qs,tid:'bild'};
+}
+(function(){const g=genME;genME=function(lv){return Math.random()<.2?genBild(lv):g(lv);};})();
+TIDN.bild='Bilder merken';TIDTIP['Bilder merken']='Erfinde eine Geschichte, die alle Bilder der Reihe nach verbindet. Eine verrückte Geschichte merkst du dir viel besser als einzelne Bilder.';
+TIDTIP['Kennzeichen merken']='Sprich das Kennzeichen als Wort oder Rhythmus (zum Beispiel G-2-3-7-N-M) und achte auf Buchstaben und Ziffern getrennt.';
+/* ---------- Fehlerbuch: Thema, Aufgabentyp, Suche, Markierungen ---------- */
+let nbCat='',nbTag='',nbSort='new',nbShowE={};
+const nbArea=n=>(n.cat&&CAT[n.cat])?CAT[n.cat].t:'Sonstiges';
+const nbTok=s=>String(s||'').split(/(\s+)/);
+const nbMarked=n=>{const hl=new Set(n.hl||[]);return nbTok(n.q).map((t,i)=>(/^\s*$/.test(t)||!hl.has(i))?esc(t):`<mark class="nbm">${esc(t)}</mark>`).join('');};
+saveNote=function(q,txt){
+  ST.notes=ST.notes||{};const k=noteKey(q);txt=String(txt||'').trim();
+  const old=ST.notes[k],hl=(S&&S.noteHlK===k&&S.noteHl)?[...S.noteHl].sort((a,b)=>a-b):((old&&old.hl)||[]);
+  if(!txt&&!hl.length){delete ST.notes[k];save();return;}
+  ST.notes[k]={t:Date.now(),txt,q:q.q,a:q.t==='mc'?q.c:showAns(q),e:q.e,id:q.id||'',cat:q.cat,g:tagOf(q),hl};save();
+};
+const _viewStep9=viewStep;
+viewStep=function(){
+  let h=_viewStep9();
+  try{if(S&&S.noteOpen&&!S._rv){const st=S.steps[S.i];if(st&&st.k==='q'){const q=st.q,k=noteKey(q);
+    if(S.noteHlK!==k){S.noteHlK=k;S.noteHl=new Set(((ST.notes||{})[k]||{}).hl||[]);}
+    const ui=`<div class="sub small" style="margin:0 0 4px">Tippe Wörter an, die du im Fehler-Tagebuch gelb markiert sehen willst:</div><div class="nwbox">${nbTok(q.q).map((t,i)=>/^\s*$/.test(t)?esc(t):`<button type="button" class="nw${S.noteHl.has(i)?' on':''}" data-act="notehl" data-i="${i}">${esc(t)}</button>`).join('')}</div>`;
+    h=h.replace('<label class="sub small" for="noteTa">',ui+'<label class="sub small" for="noteTa">');}}}catch(e){}
+  return h;
+};
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act="notehl"]');if(!b||!S||!S.noteHl)return;const i=+b.dataset.i;if(S.noteHl.has(i))S.noteHl.delete(i);else S.noteHl.add(i);b.classList.toggle('on',S.noteHl.has(i));});
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-act^="nb"]');if(!b)return;const a=b.dataset.act;
+  if(a==='nbe'){nbShowE[b.dataset.k]=!nbShowE[b.dataset.k];render();}
+  else if(a==='nbreset'){nbCat='';nbTag='';noteFilter='';nbSort='new';render();}
+});
+document.addEventListener('change',ev=>{const t=ev.target;if(!t)return;
+  if(t.id==='nbcat'){nbCat=t.value;nbTag='';render();}else if(t.id==='nbtag'){nbTag=t.value;render();}else if(t.id==='nbsort'){nbSort=t.value;render();}});
+viewNotizen=function(){
+  const N=Object.entries(ST.notes||{});
+  let h=`<button class="back" data-go="more">Mehr</button><h1 class="lt">Fehler-Tagebuch</h1><p class="sub" style="margin-top:2px">Deine Notizen zu Aufgaben, mit gelben Markierungen, sortiert nach Thema und durchsuchbar. Eine Notiz schreibst du nach einer Antwort über „Notiz ins Fehler-Tagebuch“.</p>`;
+  if(!N.length)return h+`<div class="card"><h3>Noch keine Notizen</h3><p class="sub">Schreib dir nach einer falschen Antwort kurz auf, warum, und markiere die Schlüsselwörter der Aufgabe gelb.</p><div class="row"><button class="btn" data-act="smart">Smart-Training starten</button></div></div>`;
+  const cats=[...new Set(N.map(([k,n])=>nbArea(n)))].sort(),tags=[...new Set(N.filter(([k,n])=>!nbCat||nbArea(n)===nbCat).map(([k,n])=>n.g||'Sonstiges'))].sort();
+  h+=`<input class="date" id="notesearch" type="search" placeholder="Suchen: Frage, Notiz, Antwort, Erklärung" aria-label="Notizen durchsuchen" value="${esc(noteFilter)}">
+  <div class="nbsel"><select class="date" id="nbcat" aria-label="Thema"><option value="">Alle Themen</option>${cats.map(c=>`<option ${nbCat===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+  <select class="date" id="nbtag" aria-label="Aufgabentyp"><option value="">Alle Aufgabentypen</option>${tags.map(c=>`<option ${nbTag===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+  <select class="date" id="nbsort" aria-label="Sortierung">${[['new','Neueste zuerst'],['old','Älteste zuerst'],['topic','Nach Thema'],['az','A bis Z']].map(([k,l])=>`<option value="${k}" ${nbSort===k?'selected':''}>${l}</option>`).join('')}</select></div>`;
+  const f=noteFilter.toLowerCase();
+  let L=N.filter(([k,n])=>(!f||[n.txt,n.q,n.g,n.a,n.e].join(' ').toLowerCase().includes(f))&&(!nbCat||nbArea(n)===nbCat)&&(!nbTag||(n.g||'Sonstiges')===nbTag));
+  L.sort((a,b)=>nbSort==='old'?a[1].t-b[1].t:nbSort==='az'?String(a[1].q).localeCompare(String(b[1].q),'de'):nbSort==='topic'?(nbArea(a[1]).localeCompare(nbArea(b[1]),'de')||b[1].t-a[1].t):b[1].t-a[1].t);
+  h+=`<p class="sub small">${L.length} von ${N.length} Notizen${(f||nbCat||nbTag)?' · <button class="linkb" data-act="nbreset">Filter zurücksetzen</button>':''}</p>`;
+  let last='';
+  h+=L.map(([k,n])=>{const hd=nbSort==='topic'&&nbArea(n)!==last?(last=nbArea(n),`<div class="sec" style="margin:14px 4px 4px">${esc(last)}</div>`):'';
+    return hd+`<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><span class="chip">${esc(nbArea(n))} · ${esc(n.g||'')}</span><span class="sub small">${new Date(n.t).toLocaleDateString('de-AT')}</span></div>
+   <p style="margin:8px 0 4px;font-weight:600;white-space:pre-line">${nbMarked(n)}</p><p class="sub small" style="margin:0">Richtig: <b style="color:var(--ok)">${esc(String(n.a))}</b></p>
+   ${n.txt?`<div class="exp" style="margin:8px 0">${esc(n.txt)}</div>`:''}${nbShowE[k]&&n.e?`<div class="exp" style="margin:8px 0;white-space:pre-line">${esc(n.e)}</div>`:''}
+   <div class="row" style="margin:0">${n.id&&QBYID[n.id]?`<button class="btn sm" data-act="noterun" data-id="${n.id}">Aufgabe üben</button>`:''}${n.e?`<button class="btn alt sm" data-act="nbe" data-k="${k}">${nbShowE[k]?'Erklärung ausblenden':'Erklärung'}</button>`:''}<button class="btn ${noteDel===k?'red':'alt'} sm" data-act="notedel" data-k="${k}">${noteDel===k?'Wirklich löschen':'Löschen'}</button></div></div>`;}).join('');
+  return h;
+};
+/* ---------- KI-Erklären: echte Links statt Skript-Aufruf ---------- */
+const _kiBlock9=kiBlock;
+kiBlock=function(q,c){
+  const h=_kiBlock9(q,c);
+  return h.replace(/<button class="btn alt sm" data-act="kiext" data-v="(\w+)\|(\w+)">([^<]*)<\/button>/g,(m,app,kind,label)=>{
+    let p='';try{p=kiExtPrompt(kind);}catch(e){return m;}
+    const url=app==='claude'?'https://claude.ai/new?q='+encodeURIComponent(p):'https://chatgpt.com/?q='+encodeURIComponent(p);
+    return `<a class="btn alt sm" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center" href="${esc(url)}" target="_blank" rel="noopener" data-act="kilink" data-v="${app}|${kind}">${label}</a>`;});
+};
+document.addEventListener('click',ev=>{const a=ev.target.closest('[data-act="kilink"]');if(!a)return;
+  if(navigator.onLine===false){ev.preventDefault();if(S){S.kiMsg=AI_OFF;render();}return;}
+  try{const kind=a.dataset.v.split('|')[1];navigator.clipboard&&navigator.clipboard.writeText(kiExtPrompt(kind)).catch(()=>{});}catch(e){}});
+/* ---------- Eselsbrücken und weitere Bilder für Wissen ---------- */
+Object.entries({
+nom:'„Wer oder was?“ fragen, immer zuerst. Gibt es eine Antwort, ist es der Nominativ.',
+praes:'Endungen wie eine Treppe: -e, -st, -t. Bei d und t kommt ein e dazu: du arbeit**e**st.',
+praet:'Schwache Verben bekommen ein -te (machen → machte). Starke wechseln den Vokal (gehen → ging).',
+plus:'Plus-quam-perfekt heißt „mehr als vollendet“: Es war schon vorher vorbei. Immer hatte oder war + Partizip.',
+fut1:'Zukunft braucht „werden“: Ich **werde** lernen. Das Verb steht hinten im Infinitiv.',
+fut2:'Futur II ist Futur I plus „fertig“: Bis morgen **werde** ich es geschafft **haben**.',
+st1:'Drei Lieder zum Merken: gut, besser, am besten · gern, lieber, am liebsten · viel, mehr, am meisten.',
+st2:'**als** hat einen Abstand (größer **als**), **wie** ist gleich (so groß **wie**).',
+wa:'Nomen kannst du mit „der, die, das“ verbinden. Verben kannst du tun. Adjektive antworten auf „Wie?“.',
+pass:'Passiv = werden + Partizip II. Im Perfekt wird aus „geworden“ ein **worden**: ist verhaftet worden.',
+konj:'Wünsche mit „wäre, hätte, käme“ (Konjunktiv II). Berichtetes mit „sei, habe, komme“ (Konjunktiv I).',
+gk:'Kannst du einen Artikel davor setzen („beim Lesen“, „das Lesen“)? Dann groß. Nach heute, gestern, morgen: Tageszeit groß (heute Abend).',
+komma:'Vor dass, weil, obwohl und wenn kommt immer ein Komma. Vor „und“ und „oder“ in einer Aufzählung nie.',
+dehn:'Kurz gesprochen: doppelt (Bett, Mitte). Lang gesprochen: h, ie oder Doppelvokal (Zahl, Liebe, Meer).',
+verw:'wieder = nochmals (wiederholen, mit ie). wider = gegen (widersprechen). seit = Zeit. seid = ihr seid.',
+br4:'„Mal, plus, gleicher Nenner“: 2 1/3 → 2·3 + 1 = 7, also 7/3.',
+br5:'Münzen helfen: 1/2 Euro = 50 Cent = 50 %, 1/4 Euro = 25 Cent = 25 %. Prozent heißt „pro hundert“.',
+dre:'Immer zuerst auf **eins** rechnen! Mehr Arbeiter, weniger Tage: indirekt, also mal und dann teilen.',
+pot:'3² sind 3 mal 3 Kästchen (ein Quadrat). Minus mal minus ist plus: der Feind meines Feindes ist mein Freund.',
+ein:'Kilo = tausend, Zenti = hundertstel, Milli = tausendstel. km/h durch 3,6 = m/s.',
+br2:'Oben mal oben, unten mal unten: 2/3 · 4/5 = 8/15. Vorher kürzen spart Rechenarbeit. „von“ heißt mal.',
+regel:'Punkt vor Strich. Quersumme durch 3 oder 9 teilbar → die Zahl auch. Eine Primzahl hat nur zwei Teiler: 1 und sich selbst.'
+}).forEach(([id,m])=>{if(LX[id]&&!LX[id].m)LX[id].m=m;});
+FIG.wa=()=>lxChips([['Nomen',BL,'der Mann'],['Verb',RD,'laufen'],['Adjektiv',GN,'schnell'],['Adverb',OR,'heute']],'Wortarten');
+FIG.ss=()=>lxS(340,120,lxR(8,10,150,92,GN,{r:14})+lxT(83,46,'Fuß',{c:'#fff',w:800,z:24})+lxT(83,74,'lang → ß',{c:'#fff',z:14})+lxR(182,10,150,92,RD,{r:14})+lxT(257,46,'Fluss',{c:'#fff',w:800,z:24})+lxT(257,74,'kurz → ss',{c:'#fff',z:14}),'ß nach langem, ss nach kurzem Vokal');
+FIG.gk=()=>lxChips([['das Lesen',GN,'Nomen: groß'],['beim Laufen',GN,'Artikel davor'],['abends',GY,'klein']],'Groß- und Kleinschreibung');
+FIG.komma=()=>lxChips([['Ich weiß',GY,'Hauptsatz'],[',',RD,'Komma'],['dass er kommt',BL,'Nebensatz']],'Komma vor dass');
+FIG.dehn=()=>lxChips([['Bett',RD,'kurz: doppelt'],['Zahl',GN,'lang: h'],['Liebe',GN,'lang: ie'],['Meer',GN,'lang: ee']],'Kurze und lange Vokale');
+FIG.verw=()=>lxChips([['seit',BL,'Zeit'],['seid',GN,'ihr seid'],['wieder',OR,'nochmals'],['wider',RD,'gegen']],'Wörter, die man verwechselt');
+FIG.regel=()=>lxChips([['3',GY,''],['+',GY,''],['4 · 2',RD,'zuerst'],['=',GY,''],['11',GN,'']],'Punkt vor Strich');
+/* ---------- Wiederholung: Selbsttest-Fragen kommen nach 1, 3, 7, 14 Tagen wieder ---------- */
+const LXD=[1,3,7,14,30];
+lxQStart=function(key,ids,n,onlyKeys){
+  let L=[];ids.forEach(id=>((LX[id]&&LX[id].q)||[]).forEach((q,qi)=>{const kk=id+'#'+qi;if(onlyKeys&&!onlyKeys.includes(kk))return;const sh=lxShuf(q[1].map((t,i)=>[t,i===q[2]]));L.push({id,kk,q:q[0],o:sh.map(x=>x[0]),a:sh.findIndex(x=>x[1])});}));
+  L=lxShuf(L);if(n)L=L.slice(0,n);LQ={key,list:L,i:0,score:0,sel:null,done:false};
+};
+function lxDueKeys(){const B=ST.lexb||{},now=Date.now();return Object.keys(B).filter(k=>B[k][1]<=now&&LEXI[k.split('#')[0]]);}
+function lxRec(kk,ok){ST.lexb=ST.lexb||{};const b=ST.lexb[kk]||[0,0];const nb=ok?Math.min(b[0]+1,LXD.length):0;ST.lexb[kk]=[nb,Date.now()+(ok?LXD[nb-1]:1)*864e5];}
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-act="lexa"]');
+  if(b&&LQ&&LQ.sel==null){const q=LQ.list[LQ.i],ok=+b.dataset.i===q.a;if(q.kk){lxRec(q.kk,ok);save();}}
+},true);
+const _V7lex8=V7.lex;
+V7.lex=function(){
+  let h=_V7lex8();const n=lxDueKeys().length;
+  if(n)h=h.replace('<div class="lxgrid">',`<button class="btn" style="width:100%;margin:6px 0;background:var(--ok)" data-act="lexdue">Heute fällig: ${n} Frage${n===1?'':'n'} wiederholen</button><div class="lxgrid">`);
+  return h;
+};
+V7.lexd=function(){
+  if(!LQ||LQ.key!=='due')lxQStart('due',Object.keys(LEXI),12,lxDueKeys());
+  return `<button class="back" data-act="lexb">Wissen</button><h1 class="lt">Wiederholung</h1><p class="sub">Fragen, die du falsch hattest oder lange nicht gesehen hast. Richtig beantwortet, kommen sie in 1, 3, 7, 14 und 30 Tagen wieder.</p><div class="card" id="lxq">${LQ.list.length?lxQView():'<p class="sub">Heute ist nichts fällig.</p>'}</div>`;
+};
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act="lexdue"]');if(b){LQ=null;go('lexd');}});
+Object.assign(VT,{lexd:'Wissen'});
+
+/* ===== V9: Hörbuch-Player, KI-Bestätigung, keine eigene KI ===== */
+(function(){
+const st=document.createElement('style');st.textContent=`
+#plbar{position:fixed;left:8px;right:8px;bottom:calc(60px + env(safe-area-inset-bottom));z-index:60;background:var(--card);border:1px solid var(--sep);border-radius:16px;box-shadow:0 6px 24px rgba(0,0,0,.22);padding:10px;display:none;max-width:560px;margin:0 auto}
+#plbar.on{display:block}
+#plbar.min{background:transparent;border:0;box-shadow:none;padding:0;text-align:center}
+#plbar .pill{min-height:40px;border-radius:20px;background:var(--tint);color:#fff;border:0;padding:0 18px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+#plbar .grip{width:40px;height:5px;border-radius:3px;background:var(--sep);margin:0 auto 8px}
+#plbar .plr{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#plbar button{min-height:44px;min-width:44px;border-radius:12px;border:1px solid var(--sep);background:var(--bg);color:var(--fg,inherit);font-size:15px;font-weight:600;padding:0 12px;cursor:pointer}
+#plbar button.main{background:var(--tint);color:#fff;border-color:var(--tint);flex:1}
+#plbar button.sp{min-width:48px;font-size:14px}
+#plbar button.sp.on,#plbar button.hl.on{background:var(--tint);color:#fff;border-color:var(--tint)}
+#plbar .plt{font-size:12px;color:var(--mute);margin:0 0 6px}
+#aiq{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px}
+#aiq .bx{background:var(--card);color:var(--fg,inherit);border-radius:18px;padding:20px;max-width:380px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+#aiq h3{margin:0 0 8px;font-size:19px}#aiq p{margin:0 0 16px;line-height:1.45}
+#aiq .rw{display:flex;gap:10px}#aiq button{flex:1;min-height:48px;border-radius:12px;border:1px solid var(--sep);font-size:16px;font-weight:600;cursor:pointer;background:var(--bg);color:inherit}
+#aiq button.go{background:var(--tint);color:#fff;border-color:var(--tint)}`;
+document.head.appendChild(st);
+const bar=document.createElement('div');bar.id='plbar';bar.setAttribute('role','region');bar.setAttribute('aria-label','Vorlesen steuern');document.body.appendChild(bar);
+const SPD=[.5,.75,1,1.25,1.5,2],BASE=.92;
+const mult=()=>(ST.rate||BASE)/BASE;
+const spdLbl=m=>String(m).replace('.',',')+'×';
+const hlOn=()=>ST.hl!==false;
+window.plMin=false;
+window.plUpd=function(){
+  if(!PL||PL.hidden){bar.classList.remove('on');bar.classList.remove('min');bar.innerHTML='';return;}
+  if(window.plMin){bar.classList.add('on','min');bar.innerHTML=`<button class="pill" data-pl="open" aria-label="Vorlesen-Steuerung einblenden">▲ ${PL.paused?'Pausiert':'Liest vor'} · Steuerung</button>`;return;}
+  bar.classList.remove('min');
+  const m=mult(),near=SPD.reduce((a,b)=>Math.abs(b-m)<Math.abs(a-m)?b:a);
+  bar.innerHTML=`<div class="grip"></div><p class="plt">${PL.paused?'Pausiert':'Liest vor'} · Absatz ${Math.min(PL.part+1,PL.np)} von ${PL.np}</p>
+  <div class="plr"><button class="main" data-pl="pp" aria-label="${PL.paused?'Weiter':'Pause'}">${PL.paused?'Weiter':'Pause'}</button><button data-pl="stop" aria-label="Stopp">■ Stopp</button><button class="hl ${hlOn()?'on':''}" data-pl="hl" aria-pressed="${hlOn()}" aria-label="Markierung ein oder aus">Markierung ${hlOn()?'an':'aus'}</button></div>
+  <div class="plr" style="margin-top:8px">${SPD.map(s=>`<button class="sp ${s===near?'on':''}" data-pl="sp" data-v="${s}" aria-label="Tempo ${spdLbl(s)}">${spdLbl(s)}</button>`).join('')}</div>`;
+  bar.classList.add('on');
+};
+let ty=null;
+bar.addEventListener('touchstart',e=>{e.stopPropagation();ty=e.touches[0].clientY;},{passive:true});
+bar.addEventListener('touchend',e=>{e.stopPropagation();if(ty==null)return;const dy=(e.changedTouches[0].clientY)-ty;ty=null;if(dy>40&&!window.plMin){window.plMin=true;plUpd();}else if(dy<-30&&window.plMin){window.plMin=false;plUpd();}},{passive:true});
+bar.addEventListener('touchmove',e=>{e.stopPropagation();},{passive:true});
+bar.addEventListener('click',ev=>{const b=ev.target.closest('[data-pl]');if(!b||!PL)return;ev.stopPropagation();const k=b.dataset.pl;
+  if(k==='open'){window.plMin=false;plUpd();return;}
+  if(k==='stop'){ttsStop();return;}
+  if(k==='pp'){plToggle();return;}
+  if(k==='hl'){ST.hl=!hlOn();save();plHL();plUpd();return;}
+  if(k==='sp'){ST.rate=+(+b.dataset.v*BASE).toFixed(3);save();if(PL.audio){const r=ttsRate()/.92;AUD.defaultPlaybackRate=r;AUD.playbackRate=r;}else if(PL.paused)PL.redo=true;else plQueue(PL.n);plUpd();}
+});
+})();
+let PL=null;
+function plHL(){document.querySelectorAll('.ts.reading').forEach(e=>e.classList.remove('reading'));if(PL&&PL.opt&&PL.opt.onPart&&ST.hl!==false&&PL.part>=0)PL.opt.onPart(PL.part);}
+function plQueue(from){
+  const v=bestVoice(),my=++SPK;PL.my=my;
+  try{if(speechSynthesis.paused)speechSynthesis.resume();speechSynthesis.cancel();}catch(e){}
+  PL.paused=false;PL.redo=false;const rate=ttsRate();
+  PL.jobs.forEach((j,n)=>{if(n<from)return;
+    const u=new SpeechSynthesisUtterance(j.t);u.lang=v?v.lang:'de-AT';if(v)u.voice=v;u.rate=rate;u.pitch=ST.pitch||1;u.volume=1;
+    u.onstart=()=>{if(my!==SPK||!PL)return;PL.n=n;if(PL.part!==j.part){PL.part=j.part;if(ST.hl!==false&&PL.opt.onPart)PL.opt.onPart(j.part);plUpd();}};
+    if(n===PL.jobs.length-1){
+      const fin=()=>{if(my===SPK){const o=PL&&PL.opt;PL=null;TT.on=false;plUpd();if(o&&o.onEnd)o.onEnd();}};
+      u.onend=fin;u.onerror=e=>{if(!(e&&(e.error==='canceled'||e.error==='interrupted')))fin();};
+    }
+    speechSynthesis.speak(u);});
+}
+function plToggle(){
+  if(!PL)return;
+  if(PL.audio){if(PL.paused){PL.paused=false;try{AUD.play();}catch(e){}try{navigator.mediaSession.playbackState='playing';}catch(e){}}else{PL.paused=true;try{AUD.pause();}catch(e){}try{navigator.mediaSession.playbackState='paused';}catch(e){}}plUpd();return;}
+  if(PL.paused){PL.paused=false;if(PL.redo){plQueue(PL.n);}else{try{speechSynthesis.resume();}catch(e){}const my=PL.my,n=PL.n;setTimeout(()=>{if(PL&&PL.my===my&&!PL.paused&&!speechSynthesis.speaking)plQueue(n);},500);}}
+  else{PL.paused=true;try{speechSynthesis.pause();}catch(e){}}
+  plUpd();
+}
+speakList=function(parts,opt){
+  opt=opt||{};if(!ttsOK()||!parts.length)return false;
+  try{
+    const jobs=[];parts.forEach((p,i)=>ttsSplit(speechClean(p)).forEach(t=>jobs.push({t,part:i})));
+    if(!jobs.length){TT.on=false;return false;}
+    PL={jobs,n:0,part:-1,np:parts.length,opt,paused:false,redo:false,my:0,bar:!!opt.bar};
+    TT.on=true;plQueue(0);if(!opt.bar)PL.hidden=true;
+    if(opt.bar)plUpd();
+    return true;
+  }catch(e){window.__spkErr=e;PL=null;TT.on=false;return false;}
+};
+const _ttsStop9=ttsStop;
+ttsStop=function(){SPK++;PL=null;try{if(ttsOK()){if(speechSynthesis.paused)speechSynthesis.resume();}}catch(e){}_ttsStop9();plUpd();};
+ttsToggle=function(b){
+  if(!ttsOK())return;
+  if(TT.on||PL||speechSynthesis.speaking){ttsStop();return;}
+  const box=document.getElementById('ttstext');if(!box)return;
+  const spans=[...box.querySelectorAll('.ts')];const parts=spans.length?spans.map(s=>s.textContent):[box.textContent];
+  const ok=speakList(parts,{bar:true,onPart:i=>{spans.forEach(s=>s.classList.remove('reading'));if(spans[i])spans[i].classList.add('reading');},onEnd:()=>ttsStop()});
+  if(ok){b.textContent='Stopp';b.setAttribute('aria-pressed','true');}
+};
+ttsQuestion=function(b){
+  if(TT.on||PL||speechSynthesis.speaking){ttsStop();return;}
+  const s=S&&S.steps[S.i];if(!s||s.k!=='q')return;const q=s.q;
+  const parts=splitSent(q.q.replace(/\n+/g,' '));if(q.t==='mc'&&!q.oh)q.o.forEach((o,i)=>parts.push('Antwort '+'ABCD'[i]+': '+o+'.'));
+  if(speakList(parts,{bar:true,onEnd:()=>ttsStop()})){b.textContent='Stopp';b.setAttribute('aria-pressed','true');}
+};
+/* Bestätigung vor jeder externen KI */
+function aiAsk(app,go){
+  const name=app==='claude'?'Claude':'ChatGPT';
+  const o=document.createElement('div');o.id='aiq';o.setAttribute('role','dialog');o.setAttribute('aria-modal','true');o.setAttribute('aria-label',name+' öffnen?');
+  o.innerHTML=`<div class="bx"><h3>${name} öffnen?</h3><p>Du verlässt die App. ${name} öffnet sich im Browser und bekommt deine Frage mitgeschickt.</p><div class="rw"><button data-q="no" autofocus>Abbrechen</button><button class="go" data-q="ok">Sicher, öffnen</button></div></div>`;
+  const close=()=>{o.remove();document.removeEventListener('keydown',kd,true);};
+  const kd=e=>{if(e.key==='Escape'){e.preventDefault();close();}};
+  document.addEventListener('keydown',kd,true);
+  o.addEventListener('click',e=>{const q=e.target.closest('[data-q]');if(q&&q.dataset.q==='ok'){close();go();}else if(!q&&e.target===o||q&&q.dataset.q==='no')close();});
+  document.body.appendChild(o);const nb=o.querySelector('[data-q="no"]');if(nb)nb.focus();
+}
+window.addEventListener('click',ev=>{
+  const a=ev.target.closest&&ev.target.closest('[data-act="kiext"],[data-act="kilink"],[data-act="ivext"]');if(!a)return;
+  ev.preventDefault();ev.stopImmediatePropagation();
+  const act=a.dataset.act,v=a.dataset.v||'',app=act==='ivext'?v:v.split('|')[0],kind=v.split('|')[1],href=a.getAttribute('href');
+  aiAsk(app,()=>{
+    if(act==='kilink'){
+      if(navigator.onLine===false){if(S){S.kiMsg=AI_OFF;render();}return;}
+      try{navigator.clipboard&&navigator.clipboard.writeText(kiExtPrompt(kind)).catch(()=>{});}catch(e){}
+      window.open(href,'_blank','noopener');
+    }else if(act==='kiext'){kiOpen(app,kind);}
+    else{const i=ivCur();if(i==null)return;ivMsg=extOpen(v,ivPrompt(i))?'':AI_OFF;if(ivMsg)render();}
+  });
+},true);
+
+/* ===== V9b: neue Wissensseiten Silben und Hauptglieder ===== */
+(function(){
+const add=(gi,it,lx,fig)=>{const g=LEX[gi];it.ti=gi;it.cat=g.cat;it.g=g.g;g.items.push(it);LEXI[it.id]=it;LEX_ALL.push(it);LX[it.id]=lx;FIG[it.id]=fig;};
+add(4,{id:'silb',t:'Silben und Silbentrennung',d:'Silbenbogen, Trennregeln',b:[
+"# Was ist eine Silbe?",
+"Eine Silbe ist ein Sprechtakt. Du kannst sie mitklatschen: Po – li – zei. Jede Silbe hat **einen Vokal oder Doppellaut** (a, e, i, o, u, ei, au, eu, äu, ie).",
+"# Trennen am Zeilenende",
+"• Ein einzelner Konsonant kommt auf die nächste Zeile: Ha-se, Stra-ße, Pau-se.",
+"• Bei mehreren Konsonanten kommt nur der **letzte** nach unten: Kat-ze, Hüt-te, kämp-fen, Fens-ter.",
+"• **ch, sch** und **ck** bleiben zusammen: Ta-sche, Kü-che, Zu-cker.",
+"• Zusammengesetzte Wörter trennt man an der Wortfuge: Aus-weis, Haus-tür, Ver-kehr.",
+"> Merke: Erst klatschen, dann trennen. So zählst du auch die Silben richtig."]},
+{c:'#0E7490',k:'Eine Silbe ist ein Sprechtakt mit **einem** Vokal oder Doppellaut. Beim Trennen kommt bei mehreren Konsonanten nur der **letzte** in die nächste Zeile (Kat-ze). ch, sch, ck bleiben zusammen.',m:'Klatsche das Wort mit: Po – li – zei sind drei Klatscher, also drei Silben. ei zählt als ein Laut.',q:[['Wie viele Silben hat „Polizei“?',['2','3','4','5'],1],['Wie trennt man „Katze“?',['Ka-tze','Kat-ze','Katz-e','K-atze'],1],['Wie trennt man „Fenster“?',['Fen-ster','Fens-ter','Fenst-er','F-enster'],1],['Wie viele Silben hat „Ausweis“?',['1','2','3','4'],1],['Wie trennt man „Tasche“?',['Tas-che','Ta-sche','Tasc-he','T-asche'],1]]},
+()=>{const W=[['Po','li','zei'],['Fens','ter']],C=[BL,RD,GN];let b='';
+ W.forEach((w,r)=>{let x=14;const yb=40+r*88;
+  w.forEach((s,i)=>{const wd=s.length*19,col=C[i];
+   b+=lxT(x+wd/2,yb,s,{z:30,w:800,c:col});
+   b+=`<path d="M${x+3} ${yb+10} Q${x+wd/2} ${yb+36} ${x+wd-3} ${yb+10}" style="fill:none;stroke:${col};stroke-width:3.5;stroke-linecap:round"/>`;
+   b+=lxT(x+wd/2,yb+46,String(i+1),{z:14,w:700,c:col});x+=wd+8;});
+  b+=lxT(x+8,yb,'= '+w.length+' Silben',{a:'start',z:15,w:700});});
+ return lxS(300,178,b,'Silbenbögen: Po-li-zei hat drei Silben, Fens-ter hat zwei Silben');});
+add(3,{id:'hglied',t:'Hauptglieder: Subjekt und Prädikat',d:'Kern des Satzes, Umstellprobe',b:[
+"# Die zwei Hauptglieder",
+"• **Subjekt** (Wer oder was?): steht im Nominativ. Der Polizist hilft dem Kind.",
+"• **Prädikat** (Was tut er? Was geschieht?): das Verb. Im Hauptsatz steht es an zweiter Stelle.",
+"Ohne Subjekt und Prädikat gibt es keinen vollständigen Satz. Alles andere (Objekte, Adverbiale) ergänzt sie.",
+"# Mehrteiliges Prädikat",
+"Er **hat** das Buch **gelesen**. Das Prädikat besteht aus zwei Teilen, die eine Klammer bilden.",
+"# Satzglieder finden: Umstellprobe",
+"Ein Satzglied ist alles, was beim Umstellen **zusammenbleibt**: „Dem Kind hilft der Polizist.“ Es gibt drei Satzglieder: der Polizist, hilft, dem Kind.",
+"> Merke: Erst das Prädikat suchen, dann fragen: Wer oder was tut das?"]},
+{c:IN,k:'**Subjekt** (Wer oder was? Nominativ) und **Prädikat** (Was tut er?) sind die Hauptglieder. Satzglieder erkennst du mit der Umstellprobe: Was zusammenbleibt, ist ein Glied.',m:'Erst das Verb finden (Prädikat), dann „Wer oder was + Verb?“ fragen: Das ist das Subjekt.',q:[['Welche zwei Satzglieder sind die Hauptglieder?',['Subjekt und Objekt','Subjekt und Prädikat','Prädikat und Adverbiale','Objekt und Adverbiale'],1],['In welchem Fall steht das Subjekt?',['Nominativ','Genitiv','Dativ','Akkusativ'],0],['Wie heißt das Prädikat in „Er hat das Buch gelesen“?',['hat','gelesen','hat … gelesen','das Buch'],2],['Wie fragt man nach dem Subjekt?',['Wem?','Wen oder was?','Wer oder was?','Wessen?'],2]]},
+()=>lxChips([['Der Polizist',BL,'Subjekt'],['hilft',RD,'Prädikat'],['dem Kind',GN,'Dativobjekt']],'Satzglieder: Der Polizist hilft dem Kind'));
+})();
+
+/* ===== V9c: Notiz vor der Antwort, Wissen dazu, Tonhöhe ===== */
+function noteSlot(q){
+  const k=noteKey(q),has=ST.notes&&ST.notes[k];
+  if(!S.noteOpen)return `<div class="row" style="margin:6px 0 0"><button class="btn alt sm" data-act="note">${has?'Notiz bearbeiten':'Notiz und Markierung'}</button></div>`;
+  if(S.noteHlK!==k){S.noteHlK=k;S.noteHl=new Set((has&&has.hl)||[]);}
+  const val=S.noteDraft!=null?S.noteDraft:(has?has.txt:'');
+  return `<div class="card2"><div class="sub small" style="margin:0 0 4px">Tippe Wörter an, die du später gelb markiert sehen willst:</div><div class="nwbox">${nbTok(q.q).map((t,i)=>/^\s*$/.test(t)?esc(t):`<button type="button" class="nw${S.noteHl.has(i)?' on':''}" data-act="notehl" data-i="${i}">${esc(t)}</button>`).join('')}</div><label class="sub small" for="noteTa">Deine Notiz zu dieser Aufgabe</label><textarea class="bk" id="noteTa" rows="3" placeholder="Was ist schwierig? Welche Regel merkst du dir?">${esc(val)}</textarea><div class="row" style="margin:8px 0 0"><button class="btn sm" data-act="notesave">Speichern</button><button class="btn alt sm" data-act="note">Schließen</button></div></div>`;
+}
+document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='noteTa'&&S)S.noteDraft=ev.target.value;});
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act="notesave"],[data-act="note"]');if(b&&S&&b.dataset.act==='notesave'){setTimeout(()=>{if(S)S.noteDraft=null;},0);}},true);
+const _viewNotizen9=viewNotizen;
+viewNotizen=function(){
+  let h=_viewNotizen9();
+  return h.replace(/<button class="btn (?:red|alt) sm" data-act="notedel" data-k="([^"]+)">/g,(m,k)=>{
+    const n=(ST.notes||{})[k];if(!n)return m;const t=[n.g,n.q,n.e].join(' ');let id=null;
+    for(const [r,i] of LEXR){if(r.test(t)&&LEXI[i]){id=i;break;}}
+    return (id?`<button class="btn alt sm" data-act="lexgo" data-id="${id}">Wissen dazu</button>`:'')+((n.id&&ST.bm.includes(n.id))?'<span class="chip">★ gemerkt</span>':'')+m;});
+};
+const _ttsCard9c=ttsCard;
+ttsCard=function(){
+  let h=_ttsCard9c();
+  const pt=ST.pitch||1;
+  const row=`<div class="sub small" style="margin:10px 0 4px">Klangfarbe</div><div class="seg">${[[.9,'Tiefer'],[1,'Normal'],[1.1,'Heller']].map(([k,l])=>`<button data-act="pitch" data-v="${k}" class="${Math.abs(pt-k)<.03?'on':''}">${l}</button>`).join('')}</div><div class="row" style="margin:8px 0 0"><button class="btn alt sm" data-act="soft">Sanfter Hörbuch-Ton</button></div>`;
+  return h.replace('<div class="row" style="margin:10px 0 0"><button class="btn alt sm" data-act="ttsprobe">',row+'<div class="row" style="margin:10px 0 0"><button class="btn alt sm" data-act="ttsprobe">');
+};
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act="pitch"],[data-act="soft"]');if(!b)return;
+  if(b.dataset.act==='pitch')ST.pitch=+b.dataset.v;else{ST.rate=.8;ST.pitch=.95;}
+  save();render();speakList(['Guten Tag. So klinge ich beim Vorlesen. Ich spreche ruhig und zusammenhängend.']);});
+
+/* ===== V10: Hörbuch-Audio (vorab gesprochen, läuft auch bei gesperrtem Handy) ===== */
+const AB={ready:{},idx:{},buf:{},busy:false,msg:'',url:null},AB_CACHE='hoerbuch-v1',AB_MB={m:'21',f:'22'};
+const abOn=()=>!!(ST.ab&&ST.ab.on&&ST.ab.v);
+const SILENT='data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+let ABU=null,AUD=null;
+function abEl(){if(AUD)return AUD;AUD=document.createElement('audio');AUD.preload='auto';AUD.setAttribute('playsinline','');AUD.style.display='none';document.body.appendChild(AUD);return AUD;}
+async function abHas(v){try{const c=await caches.open(AB_CACHE);return !!(await c.match('audio/'+v+'.mp3'))&&!!(await c.match('audio/'+v+'.json'));}catch(e){return false;}}
+async function abLoad(v){
+  if(AB.buf[v])return true;
+  try{const c=await caches.open(AB_CACHE);const a=await c.match('audio/'+v+'.mp3'),j=await c.match('audio/'+v+'.json');if(!a||!j)return false;AB.idx[v]=await j.json();AB.buf[v]=await a.arrayBuffer();return true;}catch(e){return false;}
+}
+async function abDownload(v){
+  AB.busy=true;AB.msg='Lade … das kann eine Minute dauern.';render();
+  try{
+    const c=await caches.open(AB_CACHE);
+    const rj=await fetch('audio/'+v+'.json',{cache:'no-store'});if(!rj.ok)throw new Error('json '+rj.status);
+    const idx=await rj.clone().json();let end=0;Object.values(idx).forEach(x=>{end=Math.max(end,x.o+x.l);});
+    const rm=await fetch('audio/'+v+'.mp3',{cache:'no-store'});if(!rm.ok)throw new Error('mp3 '+rm.status);
+    const buf=await rm.clone().arrayBuffer();if(buf.byteLength!==end)throw new Error('unvollständig');
+    await c.put('audio/'+v+'.json',rj);await c.put('audio/'+v+'.mp3',rm);
+    AB.idx[v]=idx;AB.buf[v]=buf;AB.ready[v]=true;ST.ab={on:1,v};save();AB.msg='Fertig. Die Hörbuch-Stimme ist aktiv.';
+  }catch(e){AB.msg=/mp3 404|json 404|http 404/.test(String(e.message))?'Dateien nicht gefunden. Wurde der Ordner „audio“ ins Repo hochgeladen?':'Laden fehlgeschlagen ('+e.message+'). Prüfe das Internet und versuche es erneut.';}
+  AB.busy=false;render();
+}
+function abPlay(unit,parts,opt){
+  const v=ST.ab.v,I=AB.idx[v]&&AB.idx[v][unit],buf=AB.buf[v];
+  if(!I||!buf||I.s.length!==parts.length)return false;
+  const A=abEl();try{A.pause();}catch(e){}
+  if(AB.url)URL.revokeObjectURL(AB.url);AB.url=URL.createObjectURL(new Blob([buf.slice(I.o,I.o+I.l)],{type:'audio/mpeg'}));
+  const my=++SPK;try{speechSynthesis.cancel();}catch(e){}
+  PL={audio:true,unit,jobs:[],n:0,part:-1,np:parts.length,opt,paused:false,redo:false,my,bar:true};TT.on=true;
+  A.src=AB.url;const r=ttsRate()/.92;A.defaultPlaybackRate=r;A.playbackRate=r;A.preservesPitch=true;A.webkitPreservesPitch=true;
+  A.ontimeupdate=()=>{if(!PL||PL.my!==my)return;const t=A.currentTime;let k=0;for(let i=0;i<I.s.length;i++)if(I.s[i]<=t+.05)k=i;if(k!==PL.part){PL.part=k;if(ST.hl!==false&&opt.onPart)opt.onPart(k);plUpd();}};
+  A.onended=()=>{if(!PL||PL.my!==my)return;const o=PL.opt;PL=null;TT.on=false;plUpd();if(o&&o.onEnd)o.onEnd();};
+  A.onerror=()=>{if(PL&&PL.my===my){PL=null;TT.on=false;plUpd();}};
+  const pr=A.play();if(pr&&pr.catch)pr.catch(()=>{if(PL&&PL.my===my){PL=null;TT.on=false;plUpd();}});
+  try{if('mediaSession' in navigator){const t=unit[0]==='w'?(LEXI[unit.slice(2)]||{}).t:((PASS.find(x=>'t-'+x.id===unit)||{}).title);
+    navigator.mediaSession.metadata=new MediaMetadata({title:t||'Vorlesen',artist:'Aufnahmetest Trainer',album:'Hörbuch'});
+    navigator.mediaSession.setActionHandler('play',()=>{if(PL&&PL.paused)plToggle();});
+    navigator.mediaSession.setActionHandler('pause',()=>{if(PL&&!PL.paused)plToggle();});
+    navigator.mediaSession.setActionHandler('stop',()=>ttsStop());
+    ['seekbackward','seekforward','previoustrack','nexttrack','seekto'].forEach(a=>{try{navigator.mediaSession.setActionHandler(a,null);}catch(e){}});}}catch(e){}
+  plUpd();return true;
+}
+const _speakList10=speakList;
+speakList=function(parts,opt){
+  opt=opt||{};const u=ABU;ABU=null;
+  if(u){opt=Object.assign({},opt,{bar:true});
+    if(abOn()&&AB.idx[ST.ab.v]&&AB.buf[ST.ab.v]&&abPlay(u,parts,opt))return true;}
+  return _speakList10(parts,opt);
+};
+const _ttsStop10=ttsStop;
+ttsStop=function(){if(AUD){try{AUD.pause();AUD.removeAttribute('src');AUD.load();}catch(e){}}try{if('mediaSession' in navigator)navigator.mediaSession.playbackState='none';}catch(e){}_ttsStop10();};
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act="lexsay"],[data-act="tts"]');if(!b)return;
+  if(TT.on||PL){return;}
+  ABU=null;
+  if(b.dataset.act==='lexsay')ABU='w-'+viewArg;
+  else{const st=S&&S.steps&&S.steps[S.i];const p=st&&PASS.find(x=>x.title===st.title);if(p)ABU='t-'+p.id;}
+  if(ABU&&abOn()){const A=abEl();try{A.src=SILENT;const pr=A.play();if(pr&&pr.catch)pr.catch(()=>{});}catch(e){}}
+},true);
+function abCard(){
+  const a=ST.ab||{},v=a.v||'m',on=abOn();
+  const st=AB.busy?AB.msg:(AB.msg&&!AB.ready[v]?AB.msg:(AB.ready[v]?'Geladen. Läuft offline.':'Noch nicht geladen (ca. '+AB_MB[v]+' MB, am besten im WLAN).'));
+  return `<div class="card"><b>Hörbuch-Stimme (empfohlen)</b><p class="sub small" style="margin:2px 0 8px">Fertig gesprochene Aufnahmen aller Wissensseiten und Lesetexte mit neuronaler Stimme. Sie laufen offline und auch bei gesperrtem Bildschirm. Fragen und Diktat nutzen weiter die Gerätestimme.</p>
+  <div class="seg">${[['off','Aus'],['m','Männlich'],['f','Weiblich']].map(([k,l])=>`<button data-act="abv" data-v="${k}" class="${(k==='off'&&!on)||(on&&a.v===k)?'on':''}">${l}</button>`).join('')}</div>
+  <p class="sub small" style="margin:8px 0 0">${esc(st)}</p>
+  ${AB.ready[v]||AB.busy?'':`<div class="row" style="margin:8px 0 0"><button class="btn sm" data-act="abdl" data-v="${v}">Stimme laden</button></div>`}</div>`;
+}
+const _ttsCard10=ttsCard;
+ttsCard=function(){return abCard()+_ttsCard10();};
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act="abv"],[data-act="abdl"]');if(!b)return;
+  if(b.dataset.act==='abdl'){abDownload(b.dataset.v);return;}
+  const k=b.dataset.v;if(k==='off'){ST.ab={on:0,v:(ST.ab&&ST.ab.v)||'m'};save();render();return;}
+  ST.ab={on:1,v:k};save();AB.msg='';abHas(k).then(ok=>{AB.ready[k]=ok;if(ok)return abLoad(k);}).then(()=>render());render();});
+(async()=>{for(const v of ['m','f']){AB.ready[v]=await abHas(v);}if(abOn()&&AB.ready[ST.ab.v])await abLoad(ST.ab.v);if(view==='settings')render();})();
+
+load();if(ST.set&&ST.set.tips==null)ST.set.tips=1;applyTheme();checkBadges();render();try{restoreFromMirror();}catch(e){}
 
 </script>
 <div id="upd" class="upd" role="status" hidden><span>Neue Version verfügbar</span><button class="btn sm" id="updbtn">Aktualisieren</button></div>
 <style>.upd{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);color:var(--ink);border-radius:14px;padding:10px 12px 10px 16px;box-shadow:0 6px 24px rgba(0,0,0,.18);font-weight:600;max-width:600px;margin:0 auto}.upd[hidden]{display:none}</style>
 <script>
-/* Website-Fassung: offline per Service Worker, Hinweis bei neuer Version (Version 1e5f0d54a411) */
+/* Website-Fassung: offline per Service Worker, Hinweis bei neuer Version (Version 40a9d46d4cc0) */
 (function(){
   if(!('serviceWorker' in navigator))return;
   if(!(location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))return;
