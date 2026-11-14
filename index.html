@@ -767,7 +767,7 @@ function genCubeCount(lv){
   const uniq=new Set(opts.map(o=>o.join(',')));
   if(uniq.size<4||colMax.join(',')===[...colMax].reverse().join(','))return genCubeCount(3);
   const Mh=4;
-  return MC('rv',3,`${intro}\nWelche Zeichnung zeigt die Vorderansicht (Silhouette von vorne)?`,silSvg(colMax,22,Mh),opts.slice(1).map(o=>silSvg(o,22,Mh)),'Von vorne sieht man in jeder Spalte nur den höchsten Stapel. Die Reihenfolge der Spalten bleibt von links nach rechts erhalten.',{fig,oh:true,tid:'frontsil'});
+  return MC('rv',3,`${intro}\nWelche Zeichnung zeigt die Vorderansicht (Silhouette von vorne)?`,silSvg(colMax,22,Mh),opts.slice(1).map(o=>silSvg(o,22,Mh)),`Von vorne sieht man in jeder Spalte nur den höchsten Stapel. Höchste Zahl je Spalte von links nach rechts: ${colMax.join(', ')}. So hoch sind die Säulen der richtigen Zeichnung. Die Reihenfolge der Spalten bleibt von links nach rechts erhalten.`,{fig,oh:true,tid:'frontsil'});
 }
 function genRV(lv){
   if(Math.random()<.25)return (Math.random()<.5?genDreh:genWeg)(lv);
@@ -1021,6 +1021,8 @@ function markHtml(q,sel){
     h=`<div class="mk kzg">${m.list.map((s,k)=>kzMark(s,m.t,hasSel&&sel.includes(k))).join('')}</div><p class="mkf">Gesucht: <b>${mEsc(m.t)}</b>. Genau gleich: <b>${n}</b> (mit ✓). Bei den anderen ist die abweichende Stelle markiert.</p>`;
     if(hasSel){const ok=sel.filter(k=>m.list[k]===m.t).length,bad=sel.length-ok,miss=n-ok;h+=`<p class="mkf">Von dir gewählt (●): <b>${ok}</b> richtig${bad?`, <b>${bad}</b> falsch gewählt`:''}${miss?`, <b>${miss}</b> übersehen`:''}.</p>`;}
   }else if(m.k==='zr'){
+    h=zrBox(m);
+  }else if(m.k==='zr_alt'){
     const sh=v=>m.let?AL26[v-1]:mkNum(v);
     h=`<div class="mk mono mkn">${m.seq.map((v,i)=>i===m.h?`<mark class="hit">${sh(v)}<b aria-hidden="true">✓</b></mark>`:`<span>${sh(v)}</span>`).join('<span class="dim">,</span> ')}</div>`;
     const il=m.steps.some(s=>s.il),fib=m.steps.some(s=>s.op==='fib');
@@ -1973,7 +1975,7 @@ function viewStep(){
   }
   const q=st.q,tot=qTotal(),idx=qIndex(),exam=S.mode==='exam'||S.mode==='blitz',confirmMode=S.mode==='exam';
   const L=q.lv||1;
-  let h=`<div style="display:flex;justify-content:space-between;align-items:center"><button class="back x" data-act="exitask">Beenden</button>${q.id&&!S._rv?`<button class="star ${ST.bm.includes(q.id)?'on':''}" data-act="bm" aria-label="Merken" aria-pressed="${ST.bm.includes(q.id)}">${ST.bm.includes(q.id)?'★':'☆'}</button>`:''}</div>
+  let h=`<div style="display:flex;justify-content:space-between;align-items:center"><button class="back x" data-act="exitask">Beenden</button>${bmCan(st)?`<button class="star ${bmHas(q)?'on':''}" data-act="bm" aria-label="Merken" aria-pressed="${bmHas(q)}">${bmHas(q)?'★':'☆'}</button>`:''}</div>
   <div class="prog"><span>${esc(S.label)}</span><span class="bar"><i style="width:${Math.round(100*(idx-1)/tot)}%"></i></span><span>${idx} / ${tot}</span></div>`;
   if(S.events.length&&S.cur===null&&!exam){const e=S.events.slice(-1)[0];if(e&&!e.shown){e.shown=1;S.flash=e;}}
   if(S.flash&&!exam){const e=S.flash;S.flash=null;h+=`<div class="toast pop ${e.dir==='down'?'dn':''}">${esc(CAT[e.cat].t)}: ${e.dir==='up'?'Aufgestiegen auf Stufe '+e.lv+'. Stark!':'Zurück auf Stufe '+e.lv+'. Festigen, dann geht es wieder hinauf.'}</div>`;}
@@ -2020,7 +2022,7 @@ function viewStep(){
     h+=`<div class="exp">${esc(q.e)}${ruleLine(q)}</div>`;
     h+=kiBlock(q,c);
     const nk=noteKey(q),hasN=ST.notes&&ST.notes[nk];
-    if(!S._rv)h+=S.noteOpen?`<div class="card2"><label class="sub small" for="noteTa">Deine Notiz zu dieser Aufgabe</label><textarea class="bk" id="noteTa" rows="3" placeholder="Was war der Fehler? Welche Regel merkst du dir?">${esc(hasN?hasN.txt:'')}</textarea><div class="row" style="margin:8px 0 0"><button class="btn sm" data-act="notesave">Notiz speichern</button></div></div>`:`<div class="row" style="margin:6px 0 0"><button class="btn alt sm" data-act="note">${hasN?'Notiz bearbeiten':'Notiz ins Fehler-Tagebuch'}</button></div>`;
+    h+=noteSlot(q,true);
     const last=S.i>=S.steps.length-1;
     h+=`<div class="row stick"><button class="btn" data-act="next">${last?'Ergebnis ansehen':'Weiter'}</button></div>`;
   }
@@ -2088,7 +2090,7 @@ document.addEventListener('click',ev=>{
   else if(a==='tag'){const st=stepsTag();if(st.length<5){notice='Der Prüfungstag-Modus braucht mindestens 5 Fragen, die du schon beantwortet hast. Übe zuerst ein paar Runden.';render();window.scrollTo(0,0);return;}startSession('tag','Prüfungstag-Modus',st);}
   else if(a==='tts'){ttsToggle(b);}
   else if(a==='note'){S.noteOpen=!S.noteOpen;render();const t=document.getElementById('noteTa');if(t)t.focus();}
-  else if(a==='notesave'){const t=document.getElementById('noteTa');const q=S.steps[S.i].q;saveNote(q,t?t.value:'');S.noteOpen=false;render();}
+  else if(a==='notesave'){const t=document.getElementById('noteTa');const q=curStep().q;saveNote(q,t?t.value:'');S.noteOpen=false;render();}
   else if(a==='notedel'){delNoteAsk(b.dataset.k);}
   else if(a==='noterun'){const id=b.dataset.id;if(QBYID[id])startSession('practice','Aus dem Fehler-Tagebuch',[stepFromId(id)]);}
   else if(a==='deck'){cardStart(b.dataset.v);}
@@ -2112,7 +2114,7 @@ document.addEventListener('click',ev=>{
   else if(a==='minus'){const el=document.getElementById('ans');if(el){el.value=el.value.startsWith('-')?el.value.slice(1):'-'+el.value;el.focus();}}
   else if(a==='next'){if(S&&S.rv!=null)navFwd();else advance();}
   else if(a==='memoskip'){advance();}
-  else if(a==='bm'){const st=S.steps[S.i];const id=st.q.id;const k=ST.bm.indexOf(id);if(k>=0)ST.bm.splice(k,1);else ST.bm.push(id);save();render();}
+  else if(a==='bm'){bmToggle(curStep());render();}
   else if(a==='exitask'){if(S&&(S.mode==='exam'||S.mode==='blitz')){S.confirmExit=true;render();}else leaveSession();}
   else if(a==='exitno'){S.confirmExit=false;render();}
   else if(a==='exityes'){S.confirmExit=false;if(S.mode==='exam'||S.mode==='blitz')finishSession(false);else leaveSession();}
@@ -2352,7 +2354,7 @@ function viewHome(){
 /* ---------- Üben ---------- */
 function bigCard(act,title,sub,cls,extra){return `<button class="bcard ${cls}" ${act}><span class="bpat" aria-hidden="true"></span><span class="bt">${title}</span><span class="bs">${sub}</span>${extra||''}<span class="barrow" aria-hidden="true">→</span></button>`;}
 function viewLearn(){
-  const bm=ST.bm.filter(id=>QBYID[id]).length,wr=wrongIds().length,due=dueCount();
+  const bm=bmCount(),wr=wrongIds().length,due=dueCount();
   let h=statusHead()+`<h1 class="lt" style="margin-top:4px">Üben</h1><p class="sub" style="margin-top:2px"><b>Vertiefe dein Wissen!</b> Hier findest du die wichtigsten Übungen für dich.</p>`;
   h+=bigCard('data-act="smart"','Smart-Training','Der Trainer mischt Fehler, Fälliges und Schwächen','g1');
   h+=bigCard('data-go="rep"','Wiederholung',`Übe regelmäßig deine beantworteten Fragen${due?' · '+due+' fällig':''}${wr?' · '+wr+' falsch':''}`,'g2');
@@ -2399,7 +2401,7 @@ function viewThemen(){
   <div class="row stick"><button class="btn" data-act="thgo" ${c?'':'disabled'}>Fragentraining starten</button></div>`;
 }
 function viewMarked(){
-  const n=ST.bm.filter(id=>QBYID[id]).length;
+  const n=bmCount();
   return `<button class="back" data-go="learn">Üben</button><h1 class="lt">Markierte Fragen</h1><p class="sub">Übe die Fragen, die du beim Üben mit ☆ markiert hast. Du findest sie hier, bis du die Markierung entfernst.</p>
   <div class="bignum ${n?'':'zero'}"><b>${n}</b><span>Fragen verfügbar</span></div><div class="row stick"><button class="btn" data-act="bmrun" ${n?'':'disabled'}>Fragentraining starten</button></div>`;
 }
@@ -4314,7 +4316,7 @@ TIDTIP['Kennzeichen merken']='Sprich das Kennzeichen als Wort oder Rhythmus (zum
 let nbCat='',nbTag='',nbSort='new',nbShowE={};
 const nbArea=n=>(n.cat&&CAT[n.cat])?CAT[n.cat].t:'Sonstiges';
 const nbTok=s=>String(s||'').split(/(\s+)/);
-const nbMarked=n=>{const hl=new Set(n.hl||[]);return nbTok(n.q).map((t,i)=>(/^\s*$/.test(t)||!hl.has(i))?esc(t):`<mark class="nbm">${esc(t)}</mark>`).join('');};
+const nbMarked=n=>{const mk=(txt,arr)=>{const hl=new Set(arr||[]);return nbTok(txt).map((t,i)=>(/^\s*$/.test(t)||!hl.has(i))?esc(t):`<mark class="nbm">${esc(t)}</mark>`).join('');};return mk(n.q,n.hl)+((n.at&&(n.hl2||[]).length)?`<span class="nbat">${mk(n.at,n.hl2)}</span>`:'');};
 saveNote=function(q,txt){
   ST.notes=ST.notes||{};const k=noteKey(q);txt=String(txt||'').trim();
   const old=ST.notes[k],hl=(S&&S.noteHlK===k&&S.noteHl)?[...S.noteHl].sort((a,b)=>a-b):((old&&old.hl)||[]);
@@ -4690,13 +4692,126 @@ document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act="abv
   ST.ab={on:1,v:k};save();AB.msg='';abHas(k).then(ok=>{AB.ready[k]=ok;if(ok)return abLoad(k);}).then(()=>render());render();});
 (async()=>{for(const v of ['m','f']){AB.ready[v]=await abHas(v);}if(abOn()&&AB.ready[ST.ab.v])await abLoad(ST.ab.v);if(view==='settings')render();})();
 
+/* ===== V11: Stern und Notiz überall, Antworten markieren, Zahlenreihen-Erklärung, Tatortbilder ===== */
+(function(){const st=document.createElement('style');st.textContent=`
+.zrl{display:grid;grid-template-columns:auto auto 1fr;gap:4px 10px;align-items:center;margin:8px 0 0;font-variant-numeric:tabular-nums}
+.zrl span{font-size:15px}.zrl .op{font-weight:700;color:var(--tint);background:var(--card2);border-radius:8px;padding:2px 8px;text-align:center}
+.zrl .rs{font-weight:700}.zrh{font-size:13px;font-weight:700;color:var(--ink2);margin:10px 0 0}
+.zri{margin:10px 0 0;border:1px solid var(--sep);border-radius:10px;padding:8px 10px}.zri summary{cursor:pointer;font-weight:600;color:var(--tint);min-height:28px}
+.zri ol{margin:8px 0 0;padding-left:20px}.zri li{margin:4px 0;font-size:14px}.zri p{font-size:14px;margin:8px 0 0}
+.nbat{display:block;margin-top:8px;font-weight:400;color:var(--ink2)}
+.szw{grid-column:1/-1}.szw svg{width:100%;height:auto;border-radius:12px;display:block;margin:0 0 10px;border:1px solid var(--sep)}`;document.head.appendChild(st);})();
+function curStep(){return S&&S.steps[(S.rv!=null)?S.rv:S.i];}
+const bmKey=q=>q.id||('g:'+hkey(q.q));
+function bmHas(q){return q.id?ST.bm.includes(q.id):!!(ST.bmq&&ST.bmq[bmKey(q)]);}
+function bmCan(st){return !!(st&&st.k==='q'&&st.q&&(st.q.id||!st.ctx));}
+function bmToggle(st){if(!st||!st.q)return;const q=st.q;
+  if(q.id){const k=ST.bm.indexOf(q.id);if(k>=0)ST.bm.splice(k,1);else ST.bm.push(q.id);}
+  else{ST.bmq=ST.bmq||{};const k=bmKey(q);if(ST.bmq[k])delete ST.bmq[k];else{try{ST.bmq[k]={t:Date.now(),q:JSON.parse(JSON.stringify(q))};}catch(e){}
+    const ks=Object.keys(ST.bmq).sort((a,b)=>ST.bmq[b].t-ST.bmq[a].t);ks.slice(80).forEach(x=>delete ST.bmq[x]);}}
+  save();}
+function bmCount(){return ST.bm.filter(id=>QBYID[id]).length+Object.keys(ST.bmq||{}).length;}
+stepsBookmarks=function(){const a=ST.bm.filter(id=>QBYID[id]).map(id=>stepFromId(id)),b=Object.values(ST.bmq||{}).map(x=>({k:'q',q:Object.assign({},x.q),ctx:null}));return shuffle(a.concat(b)).slice(0,20);};
+/* Notiz: Frage UND Antworten markieren, vor und nach der Antwort, auch im Rückblick */
+function noteAT(q,full){
+  let t='';
+  if(q.t==='mc'&&!q.oh&&q.o)t=q.o.slice().sort((a,b)=>String(a).localeCompare(String(b),'de')).map(o=>'• '+o).join('\n');
+  if(full){let a='';try{a=q.t==='mc'?(q.oh?'':q.o[q.ci]):String(showAns(q));}catch(e){}
+    if(a)t+=(t?'\n':'')+'Richtig: '+a;if(q.e)t+=(t?'\n':'')+'Erklärung: '+q.e;}
+  return t;
+}
+function noteSlot(q,done){
+  const k=noteKey(q),has=ST.notes&&ST.notes[k];
+  if(!S.noteOpen)return `<div class="row" style="margin:6px 0 0"><button class="btn alt sm" data-act="note">${has?'Notiz und Markierung bearbeiten':'Notiz und Markierung'}</button></div>`;
+  if(S.noteHlK!==k){S.noteHlK=k;S.noteHl=new Set((has&&has.hl)||[]);S.noteHl2=new Set((has&&has.hl2)||[]);}
+  if(!S.noteHl2)S.noteHl2=new Set();
+  const val=S.noteDraft!=null?S.noteDraft:(has?has.txt:''),at=noteAT(q,!!done);
+  const tk=(txt,set,act)=>nbTok(txt).map((t,i)=>/^\s*$/.test(t)?(/\n/.test(t)?'<br>':esc(t)):`<button type="button" class="nw${set.has(i)?' on':''}" data-act="${act}" data-i="${i}">${esc(t)}</button>`).join('');
+  return `<div class="card2"><div class="sub small" style="margin:0 0 4px">Tippe Wörter an, die du gelb markieren willst. Frage:</div><div class="nwbox">${tk(q.q,S.noteHl,'notehl')}</div>${at?`<div class="sub small" style="margin:8px 0 4px">${done?'Antworten und Erklärung:':'Antworten:'}</div><div class="nwbox">${tk(at,S.noteHl2,'notehl2')}</div>`:''}<label class="sub small nl" for="noteTa" style="display:block;margin-top:8px">Deine Notiz zu dieser Aufgabe</label><textarea class="bk" id="noteTa" rows="3" placeholder="${done?'Was war der Fehler? Welche Regel merkst du dir?':'Was ist schwierig? Welche Regel merkst du dir?'}">${esc(val)}</textarea><div class="row" style="margin:8px 0 0"><button class="btn sm" data-act="notesave">Speichern</button><button class="btn alt sm" data-act="note">Schließen</button></div></div>`;
+}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act="notehl2"]');if(!b||!S)return;if(!S.noteHl2)S.noteHl2=new Set();const i=+b.dataset.i;if(S.noteHl2.has(i))S.noteHl2.delete(i);else S.noteHl2.add(i);b.classList.toggle('on',S.noteHl2.has(i));});
+saveNote=function(q,txt){
+  ST.notes=ST.notes||{};const k=noteKey(q);txt=String(txt||'').trim();const old=ST.notes[k],live=S&&S.noteHlK===k;
+  const hl=(live&&S.noteHl)?[...S.noteHl].sort((a,b)=>a-b):((old&&old.hl)||[]),hl2=(live&&S.noteHl2)?[...S.noteHl2].sort((a,b)=>a-b):((old&&old.hl2)||[]);
+  if(!txt&&!hl.length&&!hl2.length){delete ST.notes[k];save();return;}
+  let a='';try{a=q.t==='mc'?(q.oh?'':(q.o?q.o[q.ci]:q.c)):showAns(q);}catch(e){}
+  ST.notes[k]={t:Date.now(),txt,q:q.q,a,e:q.e,id:q.id||'',cat:q.cat,g:tagOf(q),hl,hl2,at:noteAT(q,true)};save();
+};
+/* Zahlenreihen: Schritte untereinander und aufklappbare Erklärung, wie man die Regel findet */
+function zrBox(m){
+  const sh=v=>m.let?AL26[v-1]:mkNum(v);
+  let h=`<div class="mk mono mkn">${m.seq.map((v,i)=>i===m.h?`<mark class="hit">${sh(v)}<b aria-hidden="true">✓</b></mark>`:`<span>${sh(v)}</span>`).join('<span class="dim">,</span> ')}</div>`;
+  const il=m.steps.some(s=>s.il),fib=m.steps.some(s=>s.op==='fib');
+  const row=s=>fib?`<span>${esc(stepLabel(s,m.seq))}</span><span class="op">=</span><span class="rs">${sh(m.seq[s.t])}</span>`:`<span>${sh(m.seq[s.f])}</span><span class="op">${esc(stepLabel(s,m.seq))}</span><span class="rs">= ${sh(m.seq[s.t])}</span>`;
+  if(il){[0,1].forEach(p=>{h+=`<div class="zrh">Reihe ${p?'B':'A'}: Platz ${p?'2, 4, 6':'1, 3, 5'} …</div><div class="zrl">${m.steps.filter(s=>s.t%2===p).map(row).join('')}</div>`;});}
+  else h+=`<div class="zrh">Rechenschritte${m.let?' (Position im Alphabet)':''}</div><div class="zrl">${m.steps.map(row).join('')}</div>`;
+  const d=[];for(let i=1;i<m.seq.length;i++){const x=m.seq[i]-m.seq[i-1];d.push((x>=0?'+':'−')+Math.abs(x));}
+  const why=il?'Die Abstände springen hier hin und her und ergeben keine eigene Reihe. Das ist das Zeichen für zwei Reihen, die ineinanderstecken: Lies nur jede zweite Zahl, dann siehst du zwei einfache Reihen.':fib?'Die Abstände sind selbst wieder die Zahlen der Reihe. Das heißt: Jede Zahl ist die Summe der beiden Zahlen davor.':m.steps.some(s=>s.op==='*+')?'Die Zahlen wachsen schnell, aber nicht glatt. Dann steckt meistens „mal und dazu“ dahinter: erst malnehmen, dann eine feste Zahl dazu oder weg.':m.steps.some(s=>s.op==='*')?'Die Zahlen wachsen schnell. Dann teile jede Zahl durch die Zahl davor: Kommt immer dasselbe heraus, ist es eine Mal-Reihe. Wechseln sich Mal und Plus ab, schau dir die Schritte einzeln an.':'Die Abstände zeigen die Regel direkt: Sind sie gleich, wird immer dieselbe Zahl dazugezählt oder abgezogen. Wachsen sie gleichmäßig oder wechseln sie sich ab, setzt du dieses Muster einfach fort.';
+  h+=`<details class="zri"><summary>ⓘ Wie komme ich auf die Regel?</summary><p><b>Abstände in dieser Reihe:</b> ${esc(d.join(', '))}</p><p>${why}</p><ol><li>Abstand zwischen den Nachbarn ausrechnen.</li><li>Sind die Abstände nicht gleich: Bilden sie selbst eine Reihe (zum Beispiel +2, +3, +4)?</li><li>Wachsen die Zahlen schnell: mal oder geteilt prüfen.</li><li>Springt es hin und her: abwechselnde Rechenschritte oder zwei Reihen ineinander (jede zweite Zahl lesen).</li><li>Bekannte Reihen prüfen: Quadratzahlen (1, 4, 9, 16 …), Summe der zwei Vorgänger, Primzahlen.</li></ol></details>`;
+  return h;
+}
+/* Tatortbilder: Bild einprägen, danach Fragen. Zusatztraining, im offiziellen Test nicht bestätigt. */
+const SZC=[['rot','#D62828'],['blau','#1D4ED8'],['grün','#15803D'],['gelb','#EAB308'],['schwarz','#111827'],['weiß','#F1F5F9'],['orange','#EA580C']];
+const SZS=[['Juwelier',['Berger','Kogler','Steiner','Hofer']],['Bäckerei',['Auer','Moser','Pichler','Lang']],['Apotheke',['Lenz','Wagner','Brandl','Egger']],['Trafik',['Huber','Gruber','Winkler','Leitner']],['Uhrmacher',['Fuchs','Maier','Koller','Reiter']]];
+const SZR=['Herrengasse','Annenstraße','Sackstraße','Murgasse','Schmiedgasse','Neutorgasse','Sporgasse','Kaiserfeldgasse'];
+function szMake(lv){
+  const sh=pick(SZS),cols=shuffle(SZC.slice()),np=lv===1?ri(2,3):ri(2,5);
+  const s={typ:sh[0],name:pick(sh[1]),str:pick(SZR),hn:ri(2,48),hh:ri(6,22),mm:pick([5,10,15,20,25,35,40,45,50,55]),brk:pick(['links','rechts']),np,pc:cols.slice(0,np),cap:ri(0,np-1),car:cols[np]||cols[0],kz:pick(['G','GU','L','W','S','K'])+'-'+ri(100,999)+pick('ABCDEFHKLMNPRSTW'.split(''))+pick('ABCDEFHKLMNPRSTW'.split('')),bike:Math.random()<.5,dog:Math.random()<.5};
+  s.time=String(s.hh).padStart(2,'0')+':'+String(s.mm).padStart(2,'0');s.shop=s.typ+' '+s.name;return s;
+}
+function szSvg(s,label){
+  const T=(x,y,t,z,o)=>`<text x="${x}" y="${y}" text-anchor="${(o&&o.a)||'middle'}" style="font:${(o&&o.w)||700} ${z}px -apple-system,system-ui,sans-serif;fill:${(o&&o.c)||'#111'}">${esc(t)}</text>`;
+  const win=(x,b)=>`<rect x="${x}" y="70" width="80" height="55" rx="3" style="fill:#BFDBFE;stroke:#334155;stroke-width:2"/>`+(b?`<path d="M${x+40} 97 l-22 -17 M${x+40} 97 l25 -14 M${x+40} 97 l-27 9 M${x+40} 97 l20 19 M${x+40} 97 l-6 24 M${x+40} 97 l4 -25" style="stroke:#0F172A;stroke-width:2;fill:none"/><path d="M${x+31} 90 l9 -5 l10 6 l-3 12 l-12 3 z" style="fill:#0F172A"/>`:'');
+  let b=`<rect width="340" height="230" style="fill:#E0F2FE"/><rect x="20" y="20" width="300" height="130" style="fill:#F5E6C8;stroke:#78716C;stroke-width:2"/>`;
+  b+=`<rect x="24" y="28" width="74" height="18" rx="3" style="fill:#1E3A8A"/>`+T(61,41,s.str,9,{c:'#fff'});
+  b+=`<rect x="104" y="26" width="150" height="26" rx="4" style="fill:#7C2D12"/>`+T(179,44,s.shop,14,{c:'#FEF3C7'});
+  b+=`<rect x="262" y="28" width="52" height="22" rx="3" style="fill:#0B0F14"/>`+T(288,44,s.time,13,{c:'#4ADE80'});
+  b+=win(40,s.brk==='links')+win(220,s.brk==='rechts');
+  b+=`<rect x="150" y="80" width="40" height="70" style="fill:#92400E;stroke:#451A03;stroke-width:2"/><circle cx="183" cy="117" r="2.5" style="fill:#FDE68A"/><rect x="194" y="82" width="22" height="16" rx="2" style="fill:#fff;stroke:#334155"/>`+T(205,94,String(s.hn),10);
+  b+=`<rect y="150" width="340" height="26" style="fill:#D6D3D1"/><rect y="176" width="340" height="54" style="fill:#57534E"/><path d="M0 203 h340" style="stroke:#FAFAF9;stroke-width:2;stroke-dasharray:14 12"/>`;
+  const xs=shuffle([52,100,205,250,296]).slice(0,s.np).sort((a,c)=>a-c);
+  xs.forEach((x,i)=>{const c=s.pc[i][1];b+=`<rect x="${x-8}" y="138" width="16" height="24" rx="4" style="fill:${c};stroke:#0F172A;stroke-width:1.5"/><rect x="${x-6}" y="160" width="5" height="13" style="fill:#1F2937"/><rect x="${x+1}" y="160" width="5" height="13" style="fill:#1F2937"/><circle cx="${x}" cy="130" r="7" style="fill:#F2C9A0;stroke:#0F172A;stroke-width:1.2"/>`+(i===s.cap?`<path d="M${x-8} 128 a8 8 0 0 1 16 0 z" style="fill:#0F172A"/><rect x="${x+5}" y="126" width="8" height="3" style="fill:#0F172A"/>`:'');});
+  b+=`<rect x="200" y="186" width="110" height="24" rx="8" style="fill:${s.car[1]};stroke:#0F172A;stroke-width:2"/><path d="M222 186 l12 -14 h44 l12 14 z" style="fill:${s.car[1]};stroke:#0F172A;stroke-width:2"/><rect x="238" y="175" width="36" height="10" style="fill:#BFDBFE"/><circle cx="225" cy="211" r="8" style="fill:#0F172A"/><circle cx="286" cy="211" r="8" style="fill:#0F172A"/><rect x="230" y="193" width="52" height="12" rx="2" style="fill:#fff;stroke:#0F172A"/>`+T(256,202.5,s.kz,8.5);
+  if(s.bike)b+=`<circle cx="40" cy="206" r="11" style="fill:none;stroke:#0F172A;stroke-width:2.5"/><circle cx="78" cy="206" r="11" style="fill:none;stroke:#0F172A;stroke-width:2.5"/><path d="M40 206 l14 -18 h16 l8 18 M54 188 l10 18 h-24 M66 184 h8" style="fill:none;stroke:#B91C1C;stroke-width:2.5"/>`;
+  if(s.dog)b+=`<rect x="138" y="160" width="20" height="9" rx="4" style="fill:#78350F"/><circle cx="160" cy="158" r="5" style="fill:#78350F"/><rect x="140" y="168" width="3" height="6" style="fill:#78350F"/><rect x="153" y="168" width="3" height="6" style="fill:#78350F"/><path d="M138 162 l-6 -6" style="stroke:#78350F;stroke-width:2.5"/>`;
+  if(label)b+=`<rect x="4" y="4" width="46" height="16" rx="4" style="fill:#0F172A"/>`+T(27,16,label,10,{c:'#fff'});
+  return `<svg viewBox="0 0 340 230" role="img" aria-label="Tatortbild zum Einprägen">${b}</svg>`;
+}
+function szQs(s,lv,pre){
+  const P=pre?pre+': ':'',oth=(arr,x,n)=>shuffle(arr.filter(y=>y!==x)).slice(0,n),cn=SZC.map(c=>c[0]);
+  const t2=(h,m)=>String((h+24)%24).padStart(2,'0')+':'+String((m+60)%60).padStart(2,'0');
+  const sameT=SZS.find(x=>x[0]===s.typ)[1],kzW=[s.kz.replace(/\d{3}/,d=>d[1]+d[0]+d[2]),s.kz.replace(/\d{3}/,d=>d[0]+d[2]+d[1]),s.kz.slice(0,-2)+s.kz.slice(-1)+s.kz.slice(-2,-1)].filter((x,i,a)=>x!==s.kz&&a.indexOf(x)===i);
+  const L=[
+    MC('me',lv,P+'Wie hieß das Geschäft?',s.shop,oth(sameT,s.name,2).map(n=>s.typ+' '+n).concat([pick(SZS.filter(x=>x[0]!==s.typ))[0]+' '+s.name]),`Auf dem Schild stand „${s.shop}“.`),
+    MC('me',lv,P+'Welche Uhrzeit zeigte die Uhr?',s.time,[t2(s.hh+1,s.mm),t2(s.hh,s.mm+10),t2(s.hh-1,s.mm+5)].filter((x,i,a)=>x!==s.time&&a.indexOf(x)===i),`Die Uhr zeigte ${s.time} Uhr.`),
+    NUM('me',lv,P+'Wie viele Personen waren zu sehen?',s.np,`Es waren ${s.np} Personen.`),
+    MC('me',lv,P+'Welche Farbe hatte das Auto?',s.car[0],oth(cn,s.car[0],3),`Das Auto war ${s.car[0]}.`),
+    MC('me',lv,P+'Welches Fenster war eingeschlagen?','das '+(s.brk==='links'?'linke':'rechte'),['das '+(s.brk==='links'?'rechte':'linke'),'beide','keines'],`Eingeschlagen war das ${s.brk==='links'?'linke':'rechte'} Fenster.`),
+    MC('me',lv,P+'In welcher Straße war das Geschäft?',s.str,oth(SZR,s.str,3),`Auf dem Straßenschild stand „${s.str}“.`),
+    MC('me',lv,P+'Welche Jackenfarbe hatte die Person mit der Kappe?',s.pc[s.cap][0],oth(cn,s.pc[s.cap][0],3),`Die Person mit der Kappe trug ${s.pc[s.cap][0]}.`)];
+  if(lv>=2){L.push(MC('me',lv,P+'Welches Kennzeichen hatte das Auto?',s.kz,kzW.slice(0,3),`Das Kennzeichen war ${s.kz}.`),
+    MC('me',lv,P+'Welche Hausnummer hatte das Geschäft?',String(s.hn),[s.hn+2,s.hn+10,Math.max(1,s.hn-1)].filter((x,i,a)=>x!==s.hn&&a.indexOf(x)===i).map(String),`Die Hausnummer war ${s.hn}.`),
+    MC('me',lv,P+'War ein Fahrrad zu sehen?',s.bike?'Ja':'Nein',[s.bike?'Nein':'Ja'],s.bike?'Ja, auf der Straße links stand ein Fahrrad.':'Nein, es war kein Fahrrad zu sehen.'),
+    MC('me',lv,P+'War ein Hund zu sehen?',s.dog?'Ja':'Nein',[s.dog?'Nein':'Ja'],s.dog?'Ja, vor der Tür war ein Hund.':'Nein, es war kein Hund zu sehen.'));}
+  return L;
+}
+function genSzene(lv){
+  const note='<p class="sub small" style="margin:0">Präge dir alles ein: Namen, Uhrzeit, Personen, Farben, Kennzeichen. Zusatztraining: Bildszenen sind für den echten Test nicht offiziell bestätigt.</p>';
+  if(lv>=3){let a=szMake(3),b=szMake(3),g=0;while((b.shop===a.shop||b.str===a.str)&&g++<20)b=szMake(3);
+    const qs=shuffle(szQs(a,3,'Bild 1')).slice(0,3).concat(shuffle(szQs(b,3,'Bild 2')).slice(0,3));
+    return{memo:`<div class="szw">${szSvg(a,'Bild 1')}${szSvg(b,'Bild 2')}${note}</div>`,secs:50,qs:shuffle(qs),tid:'szene'};}
+  const s=szMake(lv);return{memo:`<div class="szw">${szSvg(s,'')}${note}</div>`,secs:lv===1?25:30,qs:shuffle(szQs(s,lv,'')).slice(0,lv===1?4:5),tid:'szene'};
+}
+(function(){const g=genME;genME=function(lv){return Math.random()<.2?genSzene(lv):g(lv);};})();
+TIDN.szene='Tatortbild merken';TIDTIP['Tatortbild merken']='Geh das Bild immer in derselben Reihenfolge durch: oben die Schilder und die Uhr, dann Fenster und Tür, dann Personen von links nach rechts, zuletzt die Straße. Sprich dir Zahlen leise vor.';
+
 load();if(ST.set&&ST.set.tips==null)ST.set.tips=1;applyTheme();checkBadges();render();try{restoreFromMirror();}catch(e){}
 
 </script>
 <div id="upd" class="upd" role="status" hidden><span>Neue Version verfügbar</span><button class="btn sm" id="updbtn">Aktualisieren</button></div>
 <style>.upd{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);color:var(--ink);border-radius:14px;padding:10px 12px 10px 16px;box-shadow:0 6px 24px rgba(0,0,0,.18);font-weight:600;max-width:600px;margin:0 auto}.upd[hidden]{display:none}</style>
 <script>
-/* Website-Fassung: offline per Service Worker, Hinweis bei neuer Version (Version 40a9d46d4cc0) */
+/* Website-Fassung: offline per Service Worker, Hinweis bei neuer Version (Version e150df4ae157) */
 (function(){
   if(!('serviceWorker' in navigator))return;
   if(!(location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))return;
