@@ -4617,7 +4617,7 @@ document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act="pit
   save();render();speakList(['Guten Tag. So klinge ich beim Vorlesen. Ich spreche ruhig und zusammenhängend.']);});
 
 /* ===== V10: Hörbuch-Audio (vorab gesprochen, läuft auch bei gesperrtem Handy) ===== */
-const AB={ready:{},idx:{},buf:{},busy:false,msg:'',url:null},AB_CACHE='hoerbuch-v2',AB_MB={m:'21',f:'26'};
+const AB={ready:{},idx:{},buf:{},busy:false,msg:'',url:null},AB_CACHE='hoerbuch-v3',AB_MB={m:'21',f:'26'};
 const abOn=()=>!!(ST.ab&&ST.ab.on&&ST.ab.v);
 const SILENT='data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
 let ABU=null,AUD=null;
@@ -4690,7 +4690,7 @@ document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act="abv
   if(b.dataset.act==='abdl'){abDownload(b.dataset.v);return;}
   const k=b.dataset.v;if(k==='off'){ST.ab={on:0,v:(ST.ab&&ST.ab.v)||'m'};save();render();return;}
   ST.ab={on:1,v:k};save();AB.msg='';abHas(k).then(ok=>{AB.ready[k]=ok;if(ok)return abLoad(k);}).then(()=>render());render();});
-(async()=>{try{await caches.delete('hoerbuch-v1');}catch(e){}for(const v of ['m','f']){AB.ready[v]=await abHas(v);}if(abOn()&&AB.ready[ST.ab.v])await abLoad(ST.ab.v);if(view==='settings')render();})();
+(async()=>{try{await caches.delete('hoerbuch-v1');await caches.delete('hoerbuch-v2');}catch(e){}for(const v of ['m','f']){AB.ready[v]=await abHas(v);}if(abOn()&&AB.ready[ST.ab.v])await abLoad(ST.ab.v);if(view==='settings')render();})();
 
 /* ===== V11: Stern und Notiz überall, Antworten markieren, Zahlenreihen-Erklärung, Tatortbilder ===== */
 (function(){const st=document.createElement('style');st.textContent=`
@@ -4910,7 +4910,7 @@ load();if(ST.set&&ST.set.tips==null)ST.set.tips=1;applyTheme();checkBadges();ren
 <div id="upd" class="upd" role="status" hidden><span>Neue Version verfügbar</span><button class="btn sm" id="updbtn">Aktualisieren</button></div>
 <style>.upd{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);color:var(--ink);border-radius:14px;padding:10px 12px 10px 16px;box-shadow:0 6px 24px rgba(0,0,0,.18);font-weight:600;max-width:600px;margin:0 auto}.upd[hidden]{display:none}</style>
 <script>
-/* Website-Fassung: offline per Service Worker, Hinweis bei neuer Version (Version 41ac938ed058) */
+/* Website-Fassung: offline per Service Worker, Hinweis bei neuer Version (Version ba385ae3ea53) */
 (function(){
   if(!('serviceWorker' in navigator))return;
   if(!(location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))return;
