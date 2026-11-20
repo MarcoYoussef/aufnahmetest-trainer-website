@@ -341,6 +341,20 @@ mark.diff{background:var(--bad);color:#fff;border-radius:3px;padding:0 1px;font-
 .t tr.hl td{font-weight:700;color:var(--bad)}
 .sres .qq{font-weight:600}.sres{overflow-wrap:anywhere}#qsearch{width:100%;box-sizing:border-box;display:block}
 @media (max-width:360px){.grid2{grid-template-columns:1fr}.kzg{grid-template-columns:1fr}.sring{width:74px;height:74px}.sring b{font-size:19px}.tcard .art{width:100px;opacity:.6}}
+.xov{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center}
+.xbg{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+.xsheet{position:relative;width:100%;max-width:640px;max-height:88vh;max-height:88dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:var(--card);color:var(--ink);border-radius:18px 18px 0 0;padding:10px 18px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -6px 30px rgba(0,0,0,.35)}
+.xsheet h2{margin:6px 0 0;font-size:21px}.xsheet h3{margin:0 0 6px;font-size:16px}
+.xgrab{width:40px;height:5px;border-radius:3px;background:var(--sep);margin:0 auto 8px}
+.xhead{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--card2);border-radius:12px;padding:12px 14px;margin:12px 0}
+.xkv{display:flex;flex-direction:column;gap:2px;font-size:14px;color:var(--ink2)}
+.xsec{border-top:1px solid var(--sep);padding:10px 0 4px;margin-top:8px}
+.xerr{display:flex;flex-direction:column;gap:2px;margin:6px 0}
+.xtips{margin:0;padding-left:18px;font-size:15px;color:var(--ink2)}.xtips li{margin:5px 0}
+.xdetb{width:100%;margin-top:10px}.xsheet .card{box-shadow:none;background:var(--card2);margin:10px 0}
+.xbtns .btn{font-size:16px;min-height:46px;padding:10px 12px;flex:1 1 140px}.xbtns .btn[data-act="exitleave"]:not(.red){flex-basis:100%;min-height:40px;font-size:15px}
+.xbtns{position:sticky;bottom:calc(-16px - env(safe-area-inset-bottom));background:var(--card);padding:10px 0 6px;margin-bottom:0}
+@media (min-width:700px){.xov{align-items:center}.xsheet{border-radius:18px;max-height:84vh}}
 </style>
 </head>
 <body>
@@ -1899,7 +1913,7 @@ function skipMemo(){timers.filter((t,i)=>i>0||S.mode!=='exam').forEach(()=>{});a
 const fastMode=()=>S&&(S.mode==='exam'||S.mode==='blitz');
 const askConf=()=>!fastMode()&&!!(ST.set&&ST.set.conf);
 function submit(given,conf){
-  if(S.cur||S.done)return;
+  if(S.cur||S.done||S.confirmExit)return;
   const st=S.steps[S.i];if(!st||st.k!=='q')return;
   const q=st.q;
   if(q.t!=='mc'&&!Array.isArray(given)&&String(given).trim()==='')return;
@@ -1907,7 +1921,7 @@ function submit(given,conf){
   const ms=Math.min(600000,Date.now()-(S.qT0||Date.now()));
   const help=(S.help&&S.help[S.i])||0,err=ok?'':errType(q,given,conf,ms);
   const ch=recordAnswer(q,ok,S.mode,{ms,conf,retry:!!st.re,pos:qIndex(),help,err});
-  S.res.push({q,given,ok,area:st.area||CAT[q.cat].area||null,ctx:st.ctx,retry:!!st.re,conf,help,err});
+  S.res.push({q,given,ok,area:st.area||CAT[q.cat].area||null,ctx:st.ctx,retry:!!st.re,conf,help,err,ms});
   if(ch)S.events.push({cat:q.cat,dir:ch.dir,lv:ch.lv});
   if(fastMode()){advance();return;}
   /* Abrufübung: falsch beantwortete Aufgabe kommt in dieser Runde nach ein paar anderen noch einmal */
@@ -2032,10 +2046,76 @@ function viewStep(){
   return h+`</div>`;
 }
 function viewConfirmExit(){
-  const ex=S.mode==='exam';
-  if(S.mode==='blitz')return `<div class="card"><h2>Blitzrunde beenden?</h2><p class="sub">Die Runde wird jetzt ausgewertet.</p><div class="row"><button class="btn alt" data-act="exitno">Weitermachen</button><button class="btn red" data-act="exityes">Beenden und auswerten</button></div></div>`;
-  return `<div class="card"><h2>${ex?'Probeprüfung beenden?':'Übung beenden?'}</h2><p class="sub">${ex?'Nicht beantwortete Aufgaben zählen als falsch. Die Prüfung wird jetzt ausgewertet.':'Deine bisherigen Antworten sind gespeichert.'}</p>
-  <div class="row"><button class="btn alt" data-act="exitno">Weitermachen</button><button class="btn red" data-act="exityes">${ex?'Beenden und auswerten':'Beenden'}</button></div></div>`;
+  const ex=S.mode==='exam',bz=S.mode==='blitz';
+  const first=S.res.filter(r=>!r.retry),n=first.length,ok=first.filter(r=>r.ok).length;
+  const open=Math.max(0,S.steps.filter(s=>s.k==='q'&&!s.re).length-n);
+  let h=`<div class="xov" role="dialog" aria-modal="true" aria-labelledby="xttl"><div class="xbg" data-act="exitno" aria-hidden="true"></div><div class="xsheet pop"><div class="xgrab" aria-hidden="true"></div>`;
+  h+=`<h2 id="xttl">${ex?'Probeprüfung wirklich beenden?':bz?'Blitzrunde wirklich beenden?':'Bist du sicher, dass du beenden willst?'}</h2>`;
+  h+=`<p class="sub" style="margin:4px 0 0">${ex?'Nicht beantwortete Aufgaben zählen als falsch. Die Prüfung wird danach ausgewertet.':bz?'Die Runde wird danach ausgewertet.':'Dein Fortschritt ist gespeichert. Hier ist deine Auswertung bis jetzt:'}</p>`;
+  if(n){
+    const P=sessPoints(),secs=Math.round((Date.now()-S.t0)/1000);
+    h+=`<div class="xhead"><div><div class="big" style="margin:0">${ok} / ${n}</div><div class="sub small">richtig beantwortet (${pct(ok/n)} %)</div></div><div class="xkv"><span><b>${P.got}</b> von ${P.max} Punkten</span><span>Zeit ${fmtT(secs)}</span><span>${open?open+' Fragen noch offen':'Alle Fragen beantwortet'}</span></div></div>`;
+    h+=xAnalyse(first,true);
+    const bad=first.filter(r=>!r.ok);
+    if(bad.length)h+=`<button class="btn alt sm xdetb" data-act="xdet" aria-expanded="${!!S.xDet}">${S.xDet?'Fehlerliste ausblenden':'Alle Fehler mit Lösung ansehen ('+bad.length+')'}</button>${S.xDet?reviewList(bad):''}`;
+  }else h+=`<p class="sub" style="margin:12px 0 0">Du hast in dieser Runde noch keine Frage beantwortet, darum gibt es noch keine Auswertung.</p>`;
+  h+=`<div class="row xbtns"><button class="btn" data-act="exitno">Weitermachen</button>`;
+  if(ex||bz)h+=`<button class="btn red" data-act="exityes">Beenden und auswerten</button>`;
+  else if(n)h+=`<button class="btn red" data-act="exityes">Beenden mit Ergebnis</button><button class="btn alt" data-act="exitleave">Ohne Ergebnis verlassen</button>`;
+  else h+=`<button class="btn red" data-act="exitleave">Beenden</button>`;
+  return h+`</div></div></div>`;
+}
+/* Genaue Auswertung einer Runde: Fehler nach Thema, Fehlerart, Selbsteinschätzung, Tempo, Konzentration, Tipps.
+   Grundlage: Testing-Effekt (Roediger & Karpicke 2006), verteiltes Wiederholen (Cepeda u. a. 2006),
+   Hyperkorrektur (Butterfield & Metcalfe 2001), Interleaving (Rohrer & Taylor 2007), Vigilanz-Abfall bei Daueraufmerksamkeit. */
+function xAnalyse(first,inPop){
+  const n=first.length;if(!n)return '';
+  const bad=first.filter(r=>!r.ok);let h='';
+  /* 1. Wo die Fehler liegen */
+  const g={};for(const r of first){const t=tagOf(r.q),k=r.q.cat+'|'+t;g[k]=g[k]||{c:r.q.cat,t,n:0,f:0};g[k].n++;if(!r.ok)g[k].f++;}
+  const errs=Object.values(g).filter(x=>x.f).sort((a,b)=>b.f-a.f||b.f/b.n-a.f/a.n);
+  if(errs.length){
+    h+=`<div class="xsec"><h3>Wo deine Fehler liegen</h3>`+errs.slice(0,6).map(x=>{const p=x.f/x.n;return `<div class="area"><span>${esc(x.t)}<small class="sub"> · ${esc(CAT[x.c]?CAT[x.c].t:'')}</small></span><b>${x.f} von ${x.n} falsch</b><div class="bar bad"><i style="width:${Math.max(4,pct(p))}%"></i></div></div>`;}).join('')+(errs.length>6?`<p class="sub small">… und ${errs.length-6} weitere Themen mit je wenigen Fehlern.</p>`:'')+`</div>`;
+  }else h+=`<div class="xsec"><h3>Fehler</h3><p class="sub" style="margin:0">Keine Fehler – stark! ${n>=5?'Steigere jetzt die Schwierigkeit oder übe unter Zeitdruck (Blitzrunde).':'Beantworte noch ein paar Fragen, damit die Auswertung aussagekräftig wird.'}</p></div>`;
+  /* 2. Fehlerarten */
+  const ec={};for(const r of bad){const e=r.err||'other';ec[e]=(ec[e]||0)+1;}
+  const el=Object.entries(ec).sort((a,b)=>b[1]-a[1]);
+  if(el.length)h+=`<div class="xsec"><h3>Welche Art von Fehlern</h3>`+el.map(([k,c])=>`<div class="xerr"><b>${esc(ERRT[k]?ERRT[k].t:k)} <span class="sub">(${c}×)</span></b><span class="sub small">${esc(ERRT[k]?ERRT[k].tip:'')}</span></div>`).join('')+`</div>`;
+  /* 3. Selbsteinschätzung */
+  const cf=first.filter(r=>r.conf===0||r.conf===1||r.conf===2);
+  if(cf.length>=3){
+    const L=[[2,'Sicher'],[1,'Eher sicher'],[0,'Geraten']].map(([v,l])=>{const a=cf.filter(r=>r.conf===v);return a.length?`<span><b>${l}:</b> ${a.filter(r=>r.ok).length} von ${a.length} richtig</span>`:'';}).filter(Boolean).join('');
+    const sw=cf.filter(r=>r.conf===2&&!r.ok).length,gr=cf.filter(r=>r.conf===0),grOk=gr.filter(r=>r.ok).length;
+    let m=sw?`${sw}× warst du sicher und lagst falsch. Genau diese Fehler merkst du dir am besten, wenn du die Lösung jetzt bewusst liest (Hyperkorrektur-Effekt).`:'Bei „Sicher“ lagst du immer richtig – deine Selbsteinschätzung passt.';
+    if(gr.length>=3&&grOk/gr.length>=.6)m+=` Beim Raten lagst du ${grOk} von ${gr.length}-mal richtig: Du weißt mehr, als du dir zutraust.`;
+    h+=`<div class="xsec"><h3>Selbsteinschätzung</h3><div class="xkv">${L}</div><p class="sub small" style="margin:6px 0 0">${m}</p></div>`;
+  }
+  /* 4. Tempo */
+  const okT=first.filter(r=>r.ok&&r.ms>0).map(r=>r.ms),bdT=bad.filter(r=>r.ms>0).map(r=>r.ms);
+  if(okT.length>=3&&bdT.length>=2){
+    const mo=median(okT),mb=median(bdT);let m='';
+    if(mb<.7*mo)m=`Deine falschen Antworten kamen deutlich schneller (${Math.round(mb/1000)} s) als deine richtigen (${Math.round(mo/1000)} s). Fehler entstehen bei dir eher durch Eile: Frage ganz lesen, Antwort einmal prüfen, dann abgeben.`;
+    else if(mb>1.6*mo)m=`Bei falschen Antworten hast du lange überlegt (${Math.round(mb/1000)} s statt ${Math.round(mo/1000)} s). In der Prüfung gilt: Hängst du fest, entscheide dich und geh weiter – die Zeit fehlt sonst bei leichten Aufgaben.`;
+    if(m)h+=`<div class="xsec"><h3>Tempo</h3><p class="sub small" style="margin:0">${m}</p></div>`;
+  }
+  /* 5. Konzentration im Verlauf */
+  if(n>=12){
+    const half=Math.floor(n/2),a=first.slice(0,half),b=first.slice(half);
+    const pa=a.filter(r=>r.ok).length/a.length,pb=b.filter(r=>r.ok).length/b.length;
+    if(pa-pb>=.2)h+=`<div class="xsec"><h3>Konzentration</h3><p class="sub small" style="margin:0">Erste Hälfte ${pct(pa)} % richtig, zweite Hälfte ${pct(pb)} %. Deine Konzentration lässt mit der Zeit nach. Übe in Blöcken von etwa 20–25 Minuten mit 5 Minuten Pause und trainiere die Ausdauer langsam länger.</p></div>`;
+  }
+  /* 6. Worauf du achten musst */
+  const tips=[];
+  {const tm=new Map();for(const x of errs.slice(0,3)){const t=TIDTIP[x.t]||TIPS[x.c];if(t){if(!tm.has(t))tm.set(t,[]);tm.get(t).push(x.t);}}for(const [t,ts] of [...tm].slice(0,2))tips.push(`<b>${esc(ts.join(', '))}:</b> ${esc(t)}`);}
+  if(bad.length){
+    tips.push('<b>Wiederholen mit Abstand:</b> Die falschen Fragen heute noch einmal und dann nach 1, 3 und 7 Tagen. Verteiltes Wiederholen hält deutlich länger als einmaliges Pauken – die App plant das in „Wiederholung“ automatisch.');
+    tips.push('<b>Erst selbst antworten, dann nachlesen:</b> Das Abrufen aus dem Gedächtnis (Testing-Effekt) bringt mehr als nur Lösungen durchzulesen. Nimm Tipps erst, wenn du wirklich festhängst.');
+  }
+  if(new Set(bad.map(r=>r.q.cat)).size>=3)tips.push('<b>Themen mischen:</b> Du hast Fehler in mehreren Bereichen. Gemischtes Üben (wie im echten Test) trainiert, die richtige Regel selbst zu erkennen.');
+  if(bad.some(r=>r.err==='case'))tips.push('<b>Rechtschreibung:</b> Vor dem Abgeben einmal gezielt auf Groß- und Kleinschreibung schauen.');
+  if(tips.length)h+=`<div class="xsec"><h3>Worauf du achten musst</h3><ul class="xtips">${tips.slice(0,inPop?4:5).map(t=>`<li>${t}</li>`).join('')}</ul></div>`;
+  const hp=first.filter(r=>r.help).length;if(hp)h+=`<p class="sub small" style="margin:8px 0 0">Mit Tipp gelöst: ${hp}. Diese zählen nicht als sicher gekonnt.</p>`;
+  return h;
 }
 function reviewList(items){
   if(!items.length)return '';
@@ -2067,6 +2147,7 @@ function viewResult(){
     const hp=first.filter(r=>r.help).length;if(hp)h+=`<p class="sub small" style="margin:6px 0 0">Mit Hilfe gelöst: ${hp}. Diese zählen nicht für die Prüfungsreife.</p>`;
     h+=resultCoach(first)+`</div>`;
   }
+  if(first.length)h+=`<div class="card"><h2 style="margin-top:0">Genaue Auswertung</h2>${xAnalyse(first,false)}</div>`;
   h+=`<div class="row">${S.mode!=='exam'&&S.again?`<button class="btn" data-act="again">Noch einmal</button>`:''}<button class="btn alt" data-act="leave">Zur Übersicht</button></div>`;
   h+=reviewList(first.filter(r=>!r.ok));
   return h;
@@ -2119,9 +2200,11 @@ document.addEventListener('click',ev=>{
   else if(a==='next'){if(S&&S.rv!=null)navFwd();else advance();}
   else if(a==='memoskip'){advance();}
   else if(a==='bm'){bmToggle(curStep());render();}
-  else if(a==='exitask'){if(S&&(S.mode==='exam'||S.mode==='blitz')){S.confirmExit=true;render();}else leaveSession();}
+  else if(a==='exitask'){if(!S)return;if(S.done){leaveSession();return;}S.confirmExit=true;S.xDet=false;render();}
   else if(a==='exitno'){S.confirmExit=false;render();}
-  else if(a==='exityes'){S.confirmExit=false;if(S.mode==='exam'||S.mode==='blitz')finishSession(false);else leaveSession();}
+  else if(a==='exityes'){ttsStop();S.confirmExit=false;if(S.mode==='exam'||S.mode==='blitz'||S.res.length)finishSession(false);else leaveSession();}
+  else if(a==='exitleave'){ttsStop();S.confirmExit=false;leaveSession();}
+  else if(a==='xdet'){S.xDet=!S.xDet;render();}
   else if(a==='leave')leaveSession();
   else if(a==='again'){if(S&&S.again){const f=S.again;f();}}
   else if(a==='setlv'){const id=b.dataset.id,x=+b.dataset.lv;if(x)ST.man[id]=x;else delete ST.man[id];save();render();}
@@ -2793,13 +2876,13 @@ function render(){
   renderNav();
   let h='';
   if(S){
-    if(S.confirmExit)h=viewConfirmExit();
-    else if(S.done)h=viewResult();
+    if(S.done)h=viewResult();
     else if(S.rv!=null&&S.hist&&S.hist[S.rv]){
       const keep={i:S.i,cur:S.cur,hid50:S.hid50,sel:S.sel,kz:S.kz},H=S.hist[S.rv];
       S.i=S.rv;S.cur=H.cur;S.hid50=H.hid50;S.sel=null;S.kz=H.kz;S._rv=true;
       try{h=`<div class="rvbar" role="status">Rückblick: bereits beantwortete Frage</div>`+navRow()+viewStep();}finally{S._rv=false;Object.assign(S,keep);}
     }else{S.rv=null;h=navRow()+viewStep();if(S.flashSkip){S.flashSkip=false;h=`<div class="toast pop">${esc(S.flashMsg||'Übersprungen.')}</div>`+h;}}
+    if(S.confirmExit&&!S.done)h+=viewConfirmExit();
   }else{const V={home:viewHome,learn:viewLearn,cat:()=>viewCat(viewArg),exam:viewExam,more:viewMore,stats:viewStats,backup:viewBackup,settings:viewSettings,info:viewInfo,interview:viewInterview,ablauf:viewAblauf,analyse:viewAnalyse,woche:viewWoche,methoden:viewMethoden,karten:viewKarten,notizen:viewNotizen,rep:viewRep,themen:viewThemen,marked:viewMarked,kartei:viewKartei,suche:viewSuche,fragenstand:viewFragenstand,rhythmus:viewRhythmus,diktat:viewDiktat,profil:viewProfil};h=(V[view]||V7[view]||viewHome)();}
   if(notice&&!S)h=`<div class="warnbox" role="status">${esc(notice)}</div>`+h;
   $app.innerHTML=h;syncTop();
@@ -4917,13 +5000,33 @@ genSzene=function(lv){
   return{memo:`<div class="szw">${sc.map((s,i)=>szSvg2(s,n>1?'Bild '+(i+1):s.tt)).join('')}${note}</div>`,secs:n===1?(lv===1?25:35):n===2?45:60,qs,tid:'szene'};
 };
 
+
+/* ---------- Beenden: Sicherheitsabfrage auch im Diktat, Escape schließt das Fenster ---------- */
+document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(S&&S.confirmExit&&!S.done){S.confirmExit=false;render();}else if(DK&&DK.ask){DK.ask=false;render();}});
+function dkConfirm(){
+  const r=DK.res,err=r.reduce((a,x)=>a+x.err,0),perf=r.filter(x=>!x.err).length;
+  const rules=[...new Set(r.filter(x=>x.err).map(x=>DIKTAT[x.i][1]))];
+  let h=`<div class="xov" role="dialog" aria-modal="true" aria-labelledby="xttl"><div class="xbg" data-act="dkno" aria-hidden="true"></div><div class="xsheet pop"><div class="xgrab" aria-hidden="true"></div><h2 id="xttl">Diktat wirklich beenden?</h2>`;
+  if(r.length){
+    h+=`<div class="xhead"><div><div class="big" style="margin:0">${perf} / ${r.length}</div><div class="sub small">Sätze fehlerfrei</div></div><div class="xkv"><span><b>${err}</b> Fehler gesamt</span><span>${DK.list.length-r.length} Sätze noch offen</span></div></div>`;
+    if(rules.length)h+=`<div class="xsec"><h3>Worauf du achten musst</h3><ul class="xtips">${rules.slice(0,4).map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`;
+    else h+=`<p class="sub">Bisher alles fehlerfrei – sehr gut.</p>`;
+  }else h+=`<p class="sub" style="margin:8px 0 0">Du hast noch keinen Satz geprüft, darum gibt es noch keine Auswertung.</p>`;
+  return h+`<div class="row xbtns"><button class="btn" data-act="dkno">Weitermachen</button><button class="btn red" data-act="dkleave">Beenden</button></div></div></div>`;
+}
+{const _vd=viewDiktat;viewDiktat=function(){let h=_vd();if(DK&&DK.ask&&DK.i<DK.list.length)h=h.replace('data-act="dkleave">Beenden','data-act="dkask">Beenden')+dkConfirm();else if(DK&&DK.i<DK.list.length)h=h.replace('data-act="dkleave">Beenden','data-act="dkask">Beenden');return h;};}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
+  if(a==='dkask'&&DK){ttsStop();DK.ask=true;render();}
+  else if(a==='dkno'&&DK){DK.ask=false;render();}
+});
+
 load();if(ST.set&&ST.set.tips==null)ST.set.tips=1;applyTheme();checkBadges();render();try{restoreFromMirror();}catch(e){}
 
 </script>
 <div id="upd" class="upd" role="status" hidden><span>Neue Version verfügbar</span><button class="btn sm" id="updbtn">Aktualisieren</button></div>
 <style>.upd{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);color:var(--ink);border-radius:14px;padding:10px 12px 10px 16px;box-shadow:0 6px 24px rgba(0,0,0,.18);font-weight:600;max-width:600px;margin:0 auto}.upd[hidden]{display:none}</style>
 <script>
-/* Website-Fassung: offline per Service Worker, Hinweis bei neuer Version (Version 3ec3e8bab6ea) */
+/* Website-Fassung: offline per Service Worker, Hinweis bei neuer Version (Version ad6bfb240090) */
 (function(){
   if(!('serviceWorker' in navigator))return;
   if(!(location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))return;
