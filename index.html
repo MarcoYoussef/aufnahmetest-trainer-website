@@ -5120,13 +5120,49 @@ document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act="els
   ST.set=ST.set||{};const k=b.dataset.k,v=b.dataset.v;ST.set[k]=(k==='mo'&&v==='auto')||k==='stim'?v:+v;save();elApply();render();
   if(k==='svol'||k==='stim')elTone('ok',true);});
 
+
+/* ===================== Übersicht: klare Hierarchie, Gruppen, Schalter (Gestalt-Nähe, Hick-Gesetz, Chunking) ===================== */
+const EL_GROUPS=[['Täglich',['Smart-Training','Wiederholung']],['Gezielt üben',['Üben nach Themen','Fehler-Turbo','Regel-Karten','Wissen']],['Prüfen wie im Test',['Prüfungssimulation']]];
+function elLearn(app){
+  if(app.querySelector('.sec.elg'))return;
+  const cards=[...app.querySelectorAll(':scope>.bcard')];if(cards.length<3)return;
+  const by=t=>cards.find(c=>{const b=c.querySelector('.bt');return b&&b.textContent.trim()===t;});
+  const ph=document.createComment('elg');cards[0].before(ph);const frag=document.createDocumentFragment(),used=new Set();
+  for(const [lbl,ts] of EL_GROUPS){const cs=ts.map(by).filter(Boolean);if(!cs.length)continue;
+    const h=document.createElement('h2');h.className='sec elg';h.textContent=lbl;frag.appendChild(h);cs.forEach(c=>{frag.appendChild(c);used.add(c);});}
+  const rest=cards.filter(c=>!used.has(c));
+  ph.replaceWith(frag);
+  if(rest.length){const h=document.createElement('h2');h.className='sec elg';h.textContent='Weitere';rest[0].before(h);}
+  const g=app.querySelector(':scope>.grid2');if(g&&!(g.previousElementSibling&&g.previousElementSibling.classList.contains('elg'))){const h=document.createElement('h2');h.className='sec elg';h.textContent='Werkzeuge';g.before(h);}
+}
+/* An/Aus-Paare werden zu iOS-Schaltern (gleiche Funktion, halb so viel Platz) */
+function elSwitches(app){
+  for(const seg of app.querySelectorAll('.seg')){
+    if(seg.dataset.sw)continue;const bs=[...seg.querySelectorAll(':scope>button')];
+    if(bs.length!==2||bs[0].textContent.trim()!=='An'||bs[1].textContent.trim()!=='Aus')continue;
+    seg.dataset.sw='1';const on=bs[0].classList.contains('on');const lbl=seg.getAttribute('aria-label')||'';
+    const sw=document.createElement('button');sw.type='button';sw.className='elsw';sw.setAttribute('role','switch');sw.setAttribute('aria-checked',String(on));sw.setAttribute('aria-label',lbl);
+    sw.innerHTML='<span class="elsw-t" aria-hidden="true"><span class="elsw-k"></span></span>';
+    sw.addEventListener('click',e=>{e.stopPropagation();(on?bs[1]:bs[0]).click();});
+    seg.style.display='none';seg.after(sw);
+    const row=seg.parentNode;if(row&&row!==app){row.classList.add('elswrow');}
+  }
+}
+{const _r2=render;render=function(){
+  _r2.apply(this,arguments);
+  const app=document.getElementById('app');if(!app)return;
+  if(!S&&view==='learn')elLearn(app);
+  if(!S&&view==='settings')elSwitches(app);
+  if(S&&!S.done){const q=app.querySelector('.card>.q');if(q&&q.textContent.length>140)q.classList.add('long');}
+};}
+
 load();if(ST.set&&ST.set.tips==null)ST.set.tips=1;applyTheme();elApply();checkBadges();render();try{restoreFromMirror();}catch(e){}
 
 </script>
 <div id="upd" class="upd" role="status" hidden><span>Neue Version verfügbar</span><button class="btn sm" id="updbtn">Aktualisieren</button></div>
 <style>.upd{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);color:var(--ink);border-radius:14px;padding:10px 12px 10px 16px;box-shadow:0 6px 24px rgba(0,0,0,.18);font-weight:600;max-width:600px;margin:0 auto}.upd[hidden]{display:none}</style>
 <script>
-/* Website-Fassung: offline per Service Worker, Hinweis bei neuer Version (Version 74574204191a) */
+/* Website-Fassung: offline per Service Worker, Hinweis bei neuer Version (Version f3f8513c01d2) */
 (function(){
   if(!('serviceWorker' in navigator))return;
   if(!(location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))return;
@@ -5194,6 +5230,32 @@ button,a,.opt,.btn{-webkit-tap-highlight-color:transparent;touch-action:manipula
 .fsrow .seg{flex:1 1 220px;margin:0}
 .kbd{display:inline-block;min-width:1.6em;padding:1px 6px;border-radius:6px;background:var(--fill);color:var(--ink);font-size:13px;font-weight:600;text-align:center;font-variant-numeric:tabular-nums}
 @media (prefers-reduced-motion:reduce){:root.mo2 #app.vin{animation:elFade 150ms linear backwards}:root.mo2 .opt.el-bad,:root.mo2 .opt.el-ok{animation:none}:root.mo2 .xov .xsheet,:root.mo2 .xov.out .xsheet{animation:elFade 150ms linear both}}
+</style>
+
+<style id="struktur">
+/* Themenkarten: Thema-Name groß, Nummer klein (Inhalt vor Ordnungszahl) */
+.tcard{min-height:104px;padding:14px 18px 20px}
+.tcard .tn{font-size:13px;font-weight:600;letter-spacing:.01em;opacity:.9}
+.tcard .tt{font-size:21px;font-weight:700;letter-spacing:-.015em;line-height:1.2;margin:2px 0 3px}
+.tcard .td{font-size:14px}
+/* Übungsliste: Gruppen mit Überschrift, kompaktere Karten */
+#app>.bcard{min-height:96px;margin:8px 0;padding:14px 54px 14px 18px}
+#app>.bcard .bt{font-size:21px}
+#app>.bcard .bs{font-size:14px}
+.sec.elg{margin:22px 4px 2px}
+#app>.sec.elg+.bcard{margin-top:6px}
+/* Lange Fragen: normales Gewicht, bessere Lesbarkeit für viel Text */
+.card>.q.long{font-size:18px;font-weight:500;line-height:1.42;letter-spacing:-.005em}
+/* iOS-Schalter */
+.elswrow{flex-wrap:nowrap!important;align-items:center!important}
+.elswrow>div:first-child{flex:1 1 auto;min-width:0}
+.elsw{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-width:51px;min-height:44px;padding:0;border:0;background:none;cursor:pointer}
+.elsw-t{position:relative;width:51px;height:31px;border-radius:16px;background:var(--fill);box-shadow:inset 0 0 0 1px var(--sep)}
+.elsw-k{position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.15),0 3px 1px rgba(0,0,0,.06)}
+.elsw[aria-checked="true"] .elsw-t{background:var(--ok);box-shadow:none}
+.elsw[aria-checked="true"] .elsw-k{transform:translateX(20px)}
+:root.mo2 .elsw-k{transition:transform 250ms var(--ease-std)}:root.mo2 .elsw-t{transition:background-color 200ms var(--ease-std)}
+.elsw:focus-visible{outline:3px solid var(--tint);outline-offset:2px;border-radius:18px}
 </style>
 
 </body>
