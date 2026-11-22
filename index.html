@@ -192,6 +192,7 @@ table.t th{overflow-wrap:normal;word-break:normal;-webkit-hyphens:manual;hyphens
 @media (prefers-reduced-motion: reduce){.fcard .fin{transition:none}}
 :root.noanim .fcard .fin{transition:none}
 .stick{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom));z-index:2}
+.card .row.stick{background:linear-gradient(to top,var(--card) 72%,transparent);padding-top:14px;margin-top:4px}
 /* Tabellen */
 table.t{width:100%;border-collapse:collapse;font-size:15px;font-variant-numeric:tabular-nums}
 table.t th{text-align:left;font-weight:400;color:var(--mute);font-size:13px;text-transform:uppercase;letter-spacing:.02em;padding:6px 4px}
@@ -285,7 +286,7 @@ textarea.dkin{font-size:19px;min-height:96px}
 .tcard .art{position:absolute;right:6px;top:8px;width:96px;height:66px;opacity:.9}.tcard .art svg{width:100%;height:100%}
 .tcx{position:relative;display:flex;flex-direction:column;gap:2px;max-width:calc(100% - 96px)}
 .tn{font-size:24px;font-weight:700;letter-spacing:-.02em;text-shadow:0 1px 2px rgba(0,0,0,.25)}
-.tt{font-size:16px;font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,.25)}
+.tcard .tt{font-size:16px;font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,.25)}
 .td{font-size:14px;opacity:.95}
 .tbar{position:absolute;left:0;right:0;bottom:0;height:7px;background:rgba(255,255,255,.28)}.tbar i{display:block;height:100%;background:#7CF08A}
 .a-logik{background:linear-gradient(135deg,#0B3A82,#1E6FD9)}.a-raum{background:linear-gradient(135deg,#183C6B,#2F7FBF)}.a-konz{background:linear-gradient(135deg,#0E4C5A,#1C8C9E)}.a-merk{background:linear-gradient(135deg,#2B2F7A,#5258C7)}.a-text{background:linear-gradient(135deg,#1F4F3A,#2E8A63)}.a-sprache{background:linear-gradient(135deg,#5A2A6E,#9046B0)}.a-wissen{background:linear-gradient(135deg,#3D3F46,#6A6E78)}.a-tag2{background:linear-gradient(135deg,#7A2E1E,#C2532F)}
@@ -1202,7 +1203,7 @@ function recordAnswer(q,ok,mode,x){
     const b=ST.box[q.id];const now=Date.now();
     /* Sicher und richtig: zwei Fächer weiter (seltener). Geraten und richtig: Fach bleibt, morgen wieder. */
     /* Lernkartei: richtig = eine Box höher (sicher = zwei), geraten = Box bleibt; falsch = eine Box zurück und sofort wieder fällig */
-    if(ok){const cur=b?Math.min(4,b[0]):0,inc=x.conf===2?2:(x.conf===0?0:1);const nb=Math.min(4,Math.max(cur+inc,1));ST.box[q.id]=[nb,now+(inc===0?1:(cur===4&&nb===4?30:BOXDAYS[nb]))*DAY,0];}
+    if(ok){const cur=b?Math.min(4,b[0]):0,inc=x.conf===2?2:(x.conf===0?0:1);const nb=Math.min(4,Math.max(cur+inc,1));ST.box[q.id]=[nb,now+capIv(inc===0?1:(cur===4&&nb===4?30:BOXDAYS[nb]))*DAY,0];}
     else{const cur=b?Math.min(4,b[0]):0;ST.box[q.id]=[Math.max(0,cur-1),now,1];}
   }
   const ch=(mode==='exam'||mode==='blitz'||mode==='tag'||mode==='card')?null:adapt(q.cat,q.lv||1,ok);
@@ -1483,6 +1484,8 @@ function viewAblauf(){
 }
 
 /* ---- Testtermin und Lernplan ---- */
+/* Abstand höchstens ~15 % der Tage bis Testtag 1, in den letzten 7 Tagen täglich (Cepeda et al. 2008) */
+function capIv(d){const L=daysLeft();if(L==null||L<0)return d;if(L<=7)return Math.min(d,1);return Math.max(1,Math.min(d,Math.floor(L*.15)));}
 function daysLeft(){if(!ST.tdate)return null;const t=new Date(ST.tdate+'T00:00:00');const n=new Date();n.setHours(0,0,0,0);return Math.round((t-n)/DAY);}
 /* ===================== Fehleranalyse, Wochenbericht, Lernmethoden ===================== */
 const PRACT_MODES=['practice','daily','wrong','bm','focus'];
@@ -1577,10 +1580,15 @@ function viewWoche(){
 const METHODS=[
  ['Abfragen statt nur lesen','Die App fragt dich ab, statt dir Stoff zum Lesen zu geben. Wer sich Wissen aktiv in Erinnerung ruft, behält es nach Tagen und Wochen besser als durch wiederholtes Lesen.','Roediger & Karpicke (2006), Test-Enhanced Learning','https://doi.org/10.1111/j.1467-9280.2006.01693.x'],
  ['Verteilt wiederholen','Die Lernkartei holt Aufgaben nach 1, 3, 7, 14 und 30 Tagen wieder hervor. Eine große Übersichtsarbeit stuft verteiltes Üben und Selbsttesten als die beiden wirksamsten Lerntechniken ein.','Dunlosky u. a. (2013), Psychological Science in the Public Interest','https://doi.org/10.1177/1529100612453266'],
+ ['Abstände passend zum Testtermin','Wenn du in den Einstellungen deinen Testtag einträgst, werden die Abstände nie länger als etwa 15 % der Resttage, in der letzten Woche wird täglich wiederholt. Der beste Abstand hängt davon ab, wann geprüft wird: bei einigen Wochen bis zum Test etwa 10 bis 20 % dieser Zeit.','Cepeda u. a. (2008), Psychological Science','https://doi.org/10.1111/j.1467-9280.2008.02209.x'],
  ['Falsches gleich noch einmal','Eine falsch beantwortete Aufgabe kommt in derselben Runde nach ein paar anderen wieder. Wiederholtes Abrufen ist laut Studien der Schlüssel zum langfristigen Behalten.','Karpicke & Roediger (2007)','https://profiles.wustl.edu/en/publications/repeated-retrieval-during-learning-is-the-key-to-long-term-retent/'],
  ['Gemischt üben','Das Smart-Training mischt verschiedene Aufgabenarten. Gemischtes Üben hat in Experimenten bessere Ergebnisse gebracht als Üben in Blöcken einer Aufgabenart.','Rohrer & Taylor (2007), The shuffling of mathematics problems improves learning','https://digitalcommons.usf.edu/psy_facpub/1767/'],
  ['Sofort Rückmeldung mit Erklärung','Nach jeder Antwort siehst du die Lösung und die Begründung. Rückmeldung verstärkt den Lerneffekt von Multiple-Choice-Tests und verhindert, dass du dir falsche Antworten merkst.','Butler & Roediger (2008), Memory & Cognition','https://pubmed.ncbi.nlm.nih.gov/18491500/'],
- ['Selbsteinschätzung prüfen','Mit „Wie sicher bist du?“ siehst du, wo du dich überschätzt. Überschätzung führt dazu, dass man zu früh aufhört zu lernen und schlechter abschneidet.','Dunlosky & Rawson (2012), Learning and Instruction','https://www.kent.edu/psychology/profile/john-dunlosky']
+ ['Selbsteinschätzung prüfen','Mit „Wie sicher bist du?“ siehst du, wo du dich überschätzt. Überschätzung führt dazu, dass man zu früh aufhört zu lernen und schlechter abschneidet.','Dunlosky & Rawson (2012), Learning and Instruction','https://www.kent.edu/psychology/profile/john-dunlosky'],
+ ['Erklärung nach der Antwort','Üben mit Rückmeldung bringt fast doppelt so viel wie Üben ohne. Darum zeigt die App beim Üben sofort Lösung und Begründung, in der Prüfungssimulation erst am Ende, wie im echten Test.','Rowland (2014), Psychological Bulletin','https://doi.org/10.1037/a0037559'],
+ ['Mitlesen beim Vorlesen','Text hören und gleichzeitig mitlesen ist besser als nur hören. Darum markiert die App beim Vorlesen den Satz. Für die Textaufgaben gilt: Im Test liest du selbst, also zuerst lesen und erst danach nachhören.','Adesope & Nesbit (2012), Journal of Educational Psychology','https://doi.org/10.1037/a0026083'],
+ ['Tempo bis 2×','Bis zum doppelten Tempo blieb das Verständnis in Versuchen fast gleich, darüber wurde es schlechter. Darum geht das Tempo nur bis 2×. Neuen Stoff zuerst mit 1× hören, Wiederholungen schneller.','Murphy u. a. (2022), Applied Cognitive Psychology','https://doi.org/10.1002/acp.3899'],
+ ['Sorgen aufschreiben','Zehn Minuten Sorgen aufschreiben vor einer Prüfung half sehr nervösen Schülern in Studien, besser abzuschneiden. Unter Mehr › Ruhig in den Test.','Ramirez & Beilock (2011), Science','https://doi.org/10.1126/science.1199427']
 ];
 function viewMethoden(){
   return `<button class="back" data-go="more">Mehr</button><h1 class="lt">Wie die App lernt</h1><p class="sub" style="margin-top:2px">Diese Methoden sind in der Lernforschung gut belegt und in der App eingebaut.</p>`+
@@ -1780,11 +1788,11 @@ function viewCat(id){
 
 /* ---------- Prüfung ---------- */
 function viewExam(){
-  let h=`<button class="back" data-go="learn">Üben</button><h1 class="lt">Prüfungssimulation</h1><p class="sub" style="margin-top:2px">Wie im echten Computertest: Bereiche nacheinander, ohne Rückmeldung, mit Zeitlimit.</p>${examGate()}${examModules()}
+  let h=`<button class="back" data-go="learn">Üben</button><h1 class="lt">Prüfungssimulation</h1>${examGate()}${examModules()}
   <div class="card"><table class="t"><tr><th>Bereich</th><th>Aufgaben</th></tr>
   <tr><td>Logik und Zusammenhänge</td><td>17</td></tr><tr><td>Räumliches Vorstellen</td><td>8</td></tr><tr><td>Konzentration</td><td>6</td></tr><tr><td>Merkfähigkeit</td><td>ca. 4</td></tr><tr><td>Textverständnis</td><td>8</td></tr><tr><td>Rechtschreibung und Grammatik</td><td>12</td></tr></table>
   <p class="sub small" style="margin:8px 0 0">Zeit: ${EXAM_MIN} Minuten gesamt. Stufen gemischt (leicht, mittel, schwer). Diese Zeit ist ein eigener Richtwert, die echten Zeitvorgaben kennst du erst im Test. Vor jedem Bereich kommt eine kurze Erklärung, wie im echten Test.</p></div>
-  <div class="row"><button class="btn red" data-act="exam">Probeprüfung starten</button></div>
+  <div class="row"><button class="btn" data-act="exam">Probeprüfung starten</button></div>
   <div class="card"><h3>Variante: Zeit pro Bereich</h3><p class="sub" style="margin:4px 0 8px">Jeder Bereich hat ein eigenes Zeitlimit. Ist es abgelaufen, geht es mit dem nächsten Bereich weiter, nicht bearbeitete Aufgaben zählen als falsch.</p>
   <table class="t">${AREAS.map(a=>`<tr><td>${esc(a.t)}</td><td class="n">${AREA_MIN[a.id]} Min.</td></tr>`).join('')}</table>
   <p class="sub small" style="margin:8px 0 0">Eigene Richtwerte. Die echten Zeiten pro Bereich sind nicht öffentlich.</p>
@@ -1836,7 +1844,7 @@ function viewBackup(){
 function viewSettings(){
   return `<button class="back" data-go="more">Mehr</button><h1 class="lt">Einstellungen</h1>
   <div class="card"><b>Design</b><div class="seg">${[['auto','Automatisch'],['light','Hell'],['dark','Dunkel']].map(([k,l])=>`<button data-act="theme" data-v="${k}" class="${ST.theme===k?'on':''}">${l}</button>`).join('')}</div></div>
-  <div class="card"><b>Testtag 1 (Datum)</b><input class="date" type="date" id="tdate" value="${esc(ST.tdate||'')}" aria-label="Datum Testtag 1"><p class="sub small" style="margin:6px 0 0">Damit zeigt die Startseite einen Countdown und einen Lernplan.${ST.tdate?' <button class="linkb" data-act="cleardate">Datum löschen</button>':''}</p></div>
+  <div class="card"><b>Testtag 1 (Datum)</b><input class="date" type="date" id="tdate" value="${esc(ST.tdate||'')}" aria-label="Datum Testtag 1"><p class="sub small" style="margin:6px 0 0">Damit zeigt die Startseite einen Countdown und einen Lernplan. Wiederholungen werden so getaktet, dass bis zum Test alles mehrmals drankommt (Abstand höchstens 15 % der Resttage, in der letzten Woche täglich).${ST.tdate?' <button class="linkb" data-act="cleardate">Datum löschen</button>':''}</p></div>
   <div class="card"><b>Rückmeldung beim Üben</b>${[['conf','„Wie sicher bist du?“ abfragen','Zeigt dir, wo du dich überschätzt.'],['frame','Farbiger Rahmen um die Aufgabe','Grün bei richtig, rot bei falsch.'],['sound','Ton bei Antwort','Kurzer Ton. Bei stummgeschaltetem iPhone hörst du ihn nicht.'],['anim','Animationen','Nur bei Ergebnis und Aufstieg.'],['tips','Tipps beim Üben anbieten','Tipp 1, Tipp 2 und Lösungsweg. Genutzte Hilfe zählt nicht für die Prüfungsreife.'],['tts','Vorlesen','Knopf zum Vorlesen von Lesetexten und Fragen, Stimme im Diktat (nicht in der Prüfung).'],['hapt','Vibration (Experiment)','Inoffizieller Trick für iPhones ab iOS 18. Kann ohne Vorwarnung wegfallen.']].map(([k,t,d])=>{const on=k==='tips'?!(ST.set&&ST.set.tips===0):!!(ST.set&&ST.set[k]);return `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:.5px solid var(--sep)"><div><div>${t}</div><div class="sub small">${d}</div></div><div class="seg" style="flex:0 0 132px;margin:0" role="group" aria-label="${t}"><button data-act="set" data-k="${k}" data-v="1" class="${on?'on':''}" aria-pressed="${on}">An</button><button data-act="set" data-k="${k}" data-v="0" class="${on?'':'on'}" aria-pressed="${!on}">Aus</button></div></div>`;}).join('')}
   <p class="sub small" style="margin:8px 0 0">Die offizielle Vibrations-Funktion für Webseiten gibt es in Safari nicht. Das Experiment nutzt eine Eigenheit von iOS-Schaltern und funktioniert vielleicht nicht in jeder App.</p></div>
   ${ttsCard()}
@@ -1981,7 +1989,7 @@ function viewStep(){
   if(st.k==='read'){
     return `<button class="back x" data-act="exitask">Beenden</button><div class="prog"><span>${esc(S.label)}</span><span class="bar"><i style="width:${Math.round(100*(qIndex()-1)/qTotal())}%"></i></span><span>${qIndex()-1} / ${qTotal()}</span></div>
     <div class="card"><span class="chip">Seite 1 · Text lesen</span><h2 style="margin-top:8px">${esc(st.title)}</h2>${ttsOK()&&!fastMode()&&ST.set&&ST.set.tts?`<button class="btn alt sm tts" data-act="tts" aria-pressed="false">Vorlesen</button>`:''}${sentHtml(st.text)}
-    <p class="sub small" style="margin:10px 0 0">Auf den nächsten Seiten kommen ${st.n} Fragen zu diesem Text. ${S.mode==='exam'?'Der Text wird dann ausgeblendet.':'Du kannst ihn dort bei Bedarf einblenden.'}</p>
+    <p class="sub small" style="margin:10px 0 0">Auf den nächsten Seiten kommen ${st.n} Fragen zu diesem Text. ${S.mode==='exam'?'Der Text wird dann ausgeblendet.':'Du kannst ihn dort bei Bedarf einblenden.'}${S.mode!=='exam'&&ttsOK()&&ST.set&&ST.set.tts?' Im Test liest du selbst: erst lesen, Vorlesen danach zum Nachhören.':''}</p>
     <div class="row stick"><button class="btn" data-act="readok">Weiter zu den Fragen</button></div></div>`;
   }
   if(st.k==='intro'){
@@ -2015,7 +2023,7 @@ function viewStep(){
       const gone=!done&&S.hid50&&S.hid50.i===S.i&&S.hid50.o.includes(i);
       if(gone)return `<button class="opt gone" disabled aria-label="ausgeblendet">${optHtml(q,o)}</button>`;
       const mk=done?(i===q.ci?'<span class="mk" aria-hidden="true">✓</span><span class="sr"> (richtige Antwort)</span>':(i===S.cur.given?'<span class="mk" aria-hidden="true">✗</span><span class="sr"> (deine Antwort, falsch)</span>':'')):'';
-      return `<button class="${cls}" data-act="pick" data-i="${i}" ${done?'disabled':''}>${optHtml(q,o)}${mk}</button>`;
+      return `<button class="${cls}" data-act="pick" data-i="${i}" ${done?'disabled':''}${!done&&(confirmMode||askConf())?` aria-pressed="${S.sel===i}"`:''}>${optHtml(q,o)}${mk}</button>`;
     }).join('')+`</div>`;
     if(confirmMode)h+=`<div class="row"><button class="btn" data-act="confirm" ${S.sel==null?'disabled':''}>Antwort bestätigen</button></div>`;
     else if(askConf()&&!done)h+=confRow(S.sel==null);
@@ -2059,10 +2067,10 @@ function viewConfirmExit(){
     const bad=first.filter(r=>!r.ok);
     if(bad.length)h+=`<button class="btn alt sm xdetb" data-act="xdet" aria-expanded="${!!S.xDet}">${S.xDet?'Fehlerliste ausblenden':'Alle Fehler mit Lösung ansehen ('+bad.length+')'}</button>${S.xDet?reviewList(bad):''}`;
   }else h+=`<p class="sub" style="margin:12px 0 0">Du hast in dieser Runde noch keine Frage beantwortet, darum gibt es noch keine Auswertung.</p>`;
-  h+=`<div class="row xbtns"><button class="btn" data-act="exitno">Weitermachen</button>`;
-  if(ex||bz)h+=`<button class="btn red" data-act="exityes">Beenden und auswerten</button>`;
-  else if(n)h+=`<button class="btn red" data-act="exityes">Beenden mit Ergebnis</button><button class="btn alt" data-act="exitleave">Ohne Ergebnis verlassen</button>`;
-  else h+=`<button class="btn red" data-act="exitleave">Beenden</button>`;
+  h+=`<div class="row xbtns"><button class="btn alt" data-act="exitno">Weitermachen</button>`;
+  if(ex||bz)h+=`<button class="btn" data-act="exityes">Beenden und auswerten</button>`;
+  else if(n)h+=`<button class="btn" data-act="exityes">Beenden mit Ergebnis</button><button class="btn alt" data-act="exitleave">Ohne Ergebnis verlassen</button>`;
+  else h+=`<button class="btn" data-act="exitleave">Beenden</button>`;
   return h+`</div></div></div>`;
 }
 /* Genaue Auswertung einer Runde: Fehler nach Thema, Fehlerart, Selbsteinschätzung, Tempo, Konzentration, Tipps.
@@ -2293,6 +2301,7 @@ function qHtml(q){
   if(q.mk&&q.mk.k==='kz'){const i=q.q.indexOf('\n\n');const head=(i>=0?q.q.slice(0,i):q.q);const done=!!S&&!!S.cur;const sel=kzGiven();
     if(done)return `<div class="q">${esc(head)}</div>`;
     return `<div class="q">${esc(head)}</div><p class="sub small" style="margin:6px 0 0">Tippe alle Kennzeichen an, die genau gleich sind.</p><div class="kzg kzq" role="group" aria-label="Kennzeichen-Liste">${q.mk.list.map((s,k)=>`<button class="kzc kzt ${sel.includes(k)?'on':''}" data-act="kzt" data-k="${k}" aria-pressed="${sel.includes(k)}">${esc(s)}</button>`).join('')}</div>`;}
+  if(q.mono&&q.q.indexOf('\n')>0){const k=q.q.indexOf('\n');return `<div class="q">${esc(q.q.slice(0,k))}</div><div class="q mono qdata">${esc(q.q.slice(k+1).replace(/^\n+/,''))}</div>`;}
   return `<div class="q${q.mono?' mono':''}">${esc(q.q)}</div>`;
 }
 /* Fundstellen im Lesetext markieren */
@@ -2522,7 +2531,7 @@ function examGate(){
 function examModules(){
   const xm=ST.xm||(ST.xm=Object.fromEntries(AREAS.map(a=>[a.id,1])));
   return `<div class="card"><h3>Bereiche auswählen</h3><p class="sub small" style="margin:2px 0 8px">Eine oder mehrere. Ohne Auswahl kommen alle Bereiche.</p>${AREAS.map(a=>`<button class="cbrow ${xm[a.id]?'on':''}" data-act="xm" data-k="${a.id}" aria-pressed="${!!xm[a.id]}"><span class="cbk" aria-hidden="true">${xm[a.id]?'✓':''}</span>${esc(a.t)}</button>`).join('')}
-  <div class="row" style="margin-bottom:0"><button class="btn red" data-act="xgo">Prüfung mit Auswahl starten</button></div></div>`;
+  <div class="row" style="margin-bottom:0"><button class="btn" data-act="xgo">Prüfung mit Auswahl starten</button></div></div>`;
 }
 
 /* ---------- Fehler-Rhythmus ---------- */
@@ -2574,6 +2583,7 @@ function viewMore(){
    `</div><div class="sec">Bewerbung</div><div class="list">`+
    li('data-go="ablauf"',IC.chk,'Ablauf und Checkliste','Testtage, Unterlagen, Fristen 2026','','c3')+
    li('data-go="interview"',IC.chat,'Aufnahmegespräch üben',IV.length+' typische Fragen mit Tipps','','c4')+
+   li('data-go="ruhe"','<svg viewBox="0 0 24 24"><path d="M12 21s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.6-7 10-7 10z"/></svg>','Ruhig in den Test','Sorgen aufschreiben, Atmen, Testtag-Plan','','c3')+
    li('data-go="methoden"',IC.info,'Wie die App lernt','Belegte Lernmethoden mit Quellen','','c8')+
    `</div><div class="sec">Einstellungen</div><div class="list">`+
    li('data-go="settings"',IC.gear,'Einstellungen','Design, Schrift, Tipps, Vibration, Testtermin','','c6')+
@@ -2832,7 +2842,7 @@ const navOK=()=>!!S&&!S.done&&!S.confirmExit;
 function qSteps(){return S.steps.map((s,i)=>s.k==='q'&&S.hist&&S.hist[i]?i:-1).filter(i=>i>=0);}
 function prevQ(from){const L=qSteps().filter(i=>i<from);return L.length?L[L.length-1]:null;}
 function nextQ(from){const L=qSteps().filter(i=>i>from&&i<S.i);return L.length?L[0]:null;}
-function slide(dir){const a=document.getElementById('app');if(!a||!(ST.set&&ST.set.anim))return;a.classList.remove('swl','swr');void a.offsetWidth;a.classList.add(dir<0?'swl':'swr');}
+function slide(dir){const a=document.getElementById('app');if(!a||elMo()<2)return;a.classList.remove('swl','swr');void a.offsetWidth;a.classList.add(dir<0?'swl':'swr');}
 function navBack(){if(!navOK())return;const base=S.rv!=null?S.rv:S.i;const j=prevQ(base);if(j==null)return;ttsStop();S.rv=j;slide(1);render();window.scrollTo(0,0);}
 function skipItem(){
   ttsStop();const st=S.steps[S.i];if(!st)return;
@@ -2866,9 +2876,9 @@ function navRow(){
   return `<div class="qnav">${fastMode()?'':`<button class="btn alt sm" data-act="navb" ${hasPrev?'':'disabled'} aria-label="Vorherige Frage">‹ Zurück</button>`}${S.rv!=null?`<button class="btn alt sm" data-act="rvexit">Zur aktuellen Frage</button>`:''}${canSkip?`<button class="btn alt sm" data-act="navf">${st.k==='read'?'Text überspringen ›':'Überspringen ›'}</button>`:''}</div>`;
 }
 let TS=null;
-document.addEventListener('touchstart',e=>{TS=null;if(!navOK()||e.touches.length>1)return;if(e.target.closest('input,textarea,select,.fig,.bk'))return;const t=e.touches[0];TS={x:t.clientX,y:t.clientY,t:Date.now()};},{passive:true});
+document.addEventListener('touchstart',e=>{TS=null;if(!navOK()||e.touches.length>1)return;if(e.target.closest('input,textarea,select,.fig,.bk'))return;const t=e.touches[0];if(t.clientX<24)return;TS={x:t.clientX,y:t.clientY,t:Date.now()};},{passive:true});
 document.addEventListener('touchend',e=>{if(!TS)return;const t=e.changedTouches[0];const dx=t.clientX-TS.x,dy=t.clientY-TS.y,dt=Date.now()-TS.t;TS=null;
-  if(Math.abs(dx)<70||Math.abs(dy)>Math.abs(dx)*.6||dt>900)return;if(dx<0)navBack();else navFwd();},{passive:true});
+  if(Math.abs(dx)<70||Math.abs(dy)>Math.abs(dx)*.6||dt>900)return;if(dx<0)navFwd();else navBack();},{passive:true});
 document.addEventListener('keydown',e=>{if(!navOK()||e.target.closest('input,textarea,select'))return;if(e.key==='ArrowLeft'){e.preventDefault();navBack();}else if(e.key==='ArrowRight'){e.preventDefault();navFwd();}});
 
 /* Rendern mit Rückblick-Modus (eine bereits beantwortete Frage nur ansehen) */
@@ -4791,7 +4801,7 @@ document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act="abv
 /* ===== V11: Stern und Notiz überall, Antworten markieren, Zahlenreihen-Erklärung, Tatortbilder ===== */
 (function(){const st=document.createElement('style');st.textContent=`
 .zrl{display:grid;grid-template-columns:auto auto 1fr;gap:4px 10px;align-items:center;margin:8px 0 0;font-variant-numeric:tabular-nums}
-.zrl span{font-size:15px}.zrl .op{font-weight:700;color:var(--tint);background:var(--card2);border-radius:8px;padding:2px 8px;text-align:center}
+.zrl span{font-size:15px}.zrl .op{font-weight:700;color:var(--alt-ink);background:var(--card2);border-radius:8px;padding:2px 8px;text-align:center}
 .zrl .rs{font-weight:700}.zrh{font-size:13px;font-weight:700;color:var(--ink2);margin:10px 0 0}
 .zri{margin:10px 0 0;border:1px solid var(--sep);border-radius:10px;padding:8px 10px}.zri summary{cursor:pointer;font-weight:600;color:var(--tint);min-height:28px}
 .zri ol{margin:8px 0 0;padding-left:20px}.zri li{margin:4px 0;font-size:14px}.zri p{font-size:14px;margin:8px 0 0}
@@ -5035,7 +5045,7 @@ try{matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',elA
 let ELAC=null;
 function elAC(){try{ELAC=ELAC||new (window.AudioContext||window.webkitAudioContext)();if(ELAC.state==='suspended')ELAC.resume();return ELAC;}catch(e){return null;}}
 document.addEventListener('pointerdown',()=>{if(ST.set&&ST.set.sound)elAC();},{capture:true,passive:true});
-const EL_NOTES={ok:[[659.25,0],[880,.085]],bad:[[220,0],[196,.11]],up:[[523.25,0],[659.25,.07],[783.99,.14],[1046.5,.21]],done:[[587.33,0],[783.99,.1]],tap:[[1200,0]]};
+const EL_NOTES={ok:[[659.25,0],[880,.085]],bad:[[493.88,0],[392,.11]],up:[[523.25,0],[659.25,.07],[783.99,.14],[1046.5,.21]],done:[[587.33,0],[783.99,.1]],tap:[[1200,0]]};
 function elTone(kind,force){
   if(!force&&!(ST.set&&ST.set.sound))return;
   const ac=elAC();if(!ac)return;
@@ -5258,5 +5268,75 @@ button,a,.opt,.btn{-webkit-tap-highlight-color:transparent;touch-action:manipula
 .elsw:focus-visible{outline:3px solid var(--tint);outline-offset:2px;border-radius:18px}
 </style>
 
+<style id="ruhe">
+.br-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 0 4px}
+.br-c{width:132px;height:132px;border-radius:50%;background:var(--tint-bg);border:2px solid var(--tint);display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--alt-ink);transform:scale(.72)}
+.br-c.in{transform:scale(1);transition:transform 4s cubic-bezier(.4,0,.2,1)}
+.br-c.out{transform:scale(.72);transition:transform 6s cubic-bezier(.4,0,.2,1)}
+@media (prefers-reduced-motion:reduce){.br-c,.br-c.in,.br-c.out{transform:none;transition:none}}
+.ru-t{font-variant-numeric:tabular-nums}
+#rutxt{font:17px/1.45 var(--font)}
+.br-wrap>.btn{flex:0 0 auto;align-self:stretch;min-height:44px;height:auto}
+</style>
+<script>
+/* ===================== Ruhig in den Test: Schreiben, Atmen, Testtag-Plan (belegte Methoden) ===================== */
+(function(){
+Object.assign(VT,{ruhe:'Ruhig in den Test'});
+let RT=null,BR=null;
+function ruStop(){if(RT){clearInterval(RT.iv);RT=null;}if(BR){clearTimeout(BR.to);clearInterval(BR.iv);BR=null;}}
+function fmtT(sec){sec=Math.max(0,Math.round(sec));return Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0');}
+V7.ruhe=function(){
+  const txt=(ST.ruhe&&ST.ruhe.t)||'';
+  return `<button class="back" data-go="more">Mehr</button><h1 class="lt">Ruhig in den Test</h1>
+  <p class="sub">Vier kurze Werkzeuge für die Tage vor dem Test und den Morgen des Testtags. Alles bleibt nur auf deinem Gerät.</p>
+  <div class="sec">1 · Sorgen aufschreiben (10 Minuten)</div>
+  <div class="card"><p class="sub small" style="margin:0 0 8px">Schreib direkt vor dem Üben oder am Testmorgen ehrlich auf, was dich am Test beunruhigt. In einer Studie schnitten sehr nervöse Schüler danach besser ab (Ramirez &amp; Beilock 2011, <i>Science</i>). Bei wenig Nervosität bringt es nichts, spätere Wiederholungen sind gemischt.</p>
+  <textarea class="bk" id="rutxt" rows="6" placeholder="Was mich am Test beunruhigt …" aria-label="Sorgen aufschreiben" spellcheck="true" autocapitalize="sentences">${esc(txt)}</textarea>
+  <div class="row" style="margin:8px 0 0"><button class="btn" data-act="ru-w">${RT?'Stopp':'10-Minuten-Uhr starten'}</button><button class="btn alt" data-act="ru-del" ${txt?'':'disabled'}>Text löschen</button></div>
+  <p class="sub small ru-t" id="rutime" role="timer" aria-live="off" style="margin:6px 0 0">${RT?'Noch '+fmtT(RT.end-Date.now()/1000):'Nicht schön schreiben, nur ehrlich.'}</p></div>
+  <div class="sec">2 · Langsam atmen (2 Minuten)</div>
+  <div class="card"><p class="sub small" style="margin:0 0 4px">4 Sekunden ein, 6 Sekunden aus. Langsames Ausatmen beruhigt den Puls. Für bessere Testergebnisse gibt es dazu nur wenige Belege, gegen Nervosität hilft es vielen.</p>
+  <div class="br-wrap"><div class="br-c" id="brc" aria-hidden="true">${BR?'':'Bereit'}</div><div class="sub ru-t" id="brl" role="status" aria-live="polite" aria-atomic="true">${BR?'':'2 Minuten · 12 Atemzüge'}</div>
+  <button class="btn" data-act="ru-b">${BR?'Stopp':'Atmen starten'}</button></div></div>
+  <div class="sec">3 · Aufregung umdeuten</div>
+  <div class="card"><p class="sub" style="margin:0">Herzklopfen und schnelle Atmung sind Energie für Leistung, kein Zeichen, dass du versagst. Sag dir vor dem Start: <b>„Ich bin aufgeregt, weil es mir wichtig ist. Mein Körper macht mich bereit.“</b></p><p class="sub small" style="margin:6px 0 0">Umdeuten statt Unterdrücken (Forschung von Jamieson und Kollegen). Kostet nichts, schadet nicht.</p></div>
+  <div class="sec">4 · Testtag-Plan</div>
+  <div class="card"><ul class="sub" style="margin:0;padding-left:18px">
+  <li>Am Vorabend: kein neuer Stoff mehr, nur eine kurze Wiederholung. Ausreichend schlafen.</li>
+  <li>Ausweis, Einladung und Lebenslauf (für Testtag 2) einpacken, Anfahrt mit Puffer planen.</li>
+  <li>Frühstücken und Wasser trinken. Der Computertest dauert etwa 2–3 Stunden.</li>
+  <li>Vor jeder Aufgabengruppe kommen Erklärung und Übungsaufgaben: in Ruhe lesen, das spart Fehler.</li>
+  <li>Bei einer schweren Aufgabe nicht hängen bleiben. Beim Persönlichkeitsfragebogen ehrlich und gleichbleibend antworten.</li></ul>
+  <p class="note">Ablauf laut polizeikarriere.gv.at, Stand November 2026. Maßgeblich ist immer deine Einladung.</p></div>`;
+};
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-act^="ru-"]');if(!b||view!=='ruhe')return;const a=b.dataset.act;
+  if(a==='ru-w'){if(RT){clearInterval(RT.iv);RT=null;render();return;}
+    RT={end:Date.now()/1000+600};RT.iv=setInterval(()=>{const el=document.getElementById('rutime');const r=RT.end-Date.now()/1000;
+      if(r<=0){clearInterval(RT.iv);RT=null;if(el){el.setAttribute('aria-live','polite');el.setAttribute('role','status');}if(el)el.textContent='Zeit um. Gut gemacht, jetzt kannst du loslegen.';try{elHap('ok');}catch(e){}const bt=document.querySelector('[data-act="ru-w"]');if(bt)bt.textContent='10-Minuten-Uhr starten';return;}
+      if(el)el.textContent='Noch '+fmtT(r);},1000);render();const t=document.getElementById('rutxt');if(t)t.focus();}
+  else if(a==='ru-del'){ST.ruhe={t:''};save();render();}
+  else if(a==='ru-b'){if(BR){clearTimeout(BR.to);clearInterval(BR.iv);BR=null;render();return;}
+    BR={n:0};render();const step=()=>{const c=document.getElementById('brc'),l=document.getElementById('brl');if(!BR||!c)return;
+      if(BR.n>=24){BR=null;c.className='br-c';c.textContent='Fertig';if(l)l.textContent='Gut gemacht.';const bt=document.querySelector('[data-act="ru-b"]');if(bt)bt.textContent='Atmen starten';return;}
+      const inh=BR.n%2===0,sec=inh?4:6;c.className='br-c '+(inh?'in':'out');c.textContent=inh?'Ein':'Aus';
+      if(l)l.textContent=`${inh?'Einatmen':'Ausatmen'} · Atemzug ${Math.floor(BR.n/2)+1} von 12`;BR.n++;BR.to=setTimeout(step,sec*1000);};
+    requestAnimationFrame(()=>requestAnimationFrame(step));}
+});
+document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='rutxt'){ST.ruhe={t:ev.target.value};save();const d=document.querySelector('[data-act="ru-del"]');if(d)d.disabled=!ev.target.value;}});
+const _g=go;go=function(v,arg){if(v!=='ruhe')ruStop();return _g(v,arg);};
+{const _r3=render;render=function(){const hadX=!!document.querySelector('.xov');_r3();try{
+  const x=document.querySelector('.xov .xsheet');
+  if(x&&!hadX){const f=x.querySelector('button.btn[data-act="exitno"],button.btn[data-act="dkno"]')||x.querySelector('button,[href],input,textarea');if(f)f.focus({preventScroll:true});}
+  else if(S&&S.cur&&S._fv!==S.i){S._fv=S.i;const v=document.querySelector('.verdict');if(v){v.setAttribute('tabindex','-1');v.focus({preventScroll:true});}}
+}catch(e){}};}
+document.addEventListener('keydown',e=>{if(e.key!=='Tab')return;const x=document.querySelector('.xov .xsheet');if(!x)return;
+  const f=[...x.querySelectorAll('button:not([disabled]),[href],input,textarea')];if(!f.length)return;const a=f[0],z=f[f.length-1];
+  if(!x.contains(document.activeElement)){e.preventDefault();a.focus();}
+  else if(e.shiftKey&&document.activeElement===a){e.preventDefault();z.focus();}
+  else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus();}});
+
+})();
+</script>
 </body>
 </html>
