@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-3Hce2F1UvbrCqZypAHnU3Qk/8+AqjqjfgleXueYqnLM=' 'sha256-3xswfkFtckRRfkr+btNAFTdyh8wqxjtgZHr89Ey8XrI=' 'sha256-Y+n/hLNluV31i134qe0EeiNeG3ALVRcxdskKNKS+VwY=' 'sha256-Khk4Fep6QneqngYAlLIG3H888lQAbb171RDrdY81/tc=' 'sha256-EpXRkd64KMWYAryiJ1Pk48L4BoK1sbY9q/FDHFmyBjM='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://generativelanguage.googleapis.com https://api.anthropic.com https://api.openai.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-3Hce2F1UvbrCqZypAHnU3Qk/8+AqjqjfgleXueYqnLM=' 'sha256-3xswfkFtckRRfkr+btNAFTdyh8wqxjtgZHr89Ey8XrI=' 'sha256-Y+n/hLNluV31i134qe0EeiNeG3ALVRcxdskKNKS+VwY=' 'sha256-Khk4Fep6QneqngYAlLIG3H888lQAbb171RDrdY81/tc=' 'sha256-cnm17EnUMNItfhmeCbUtfh4YfBETN7+LLsqY55I1e+g='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://generativelanguage.googleapis.com https://api.anthropic.com https://api.openai.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="thc" content="#000000">
@@ -5708,6 +5708,29 @@ function moreAdd(app){
   const se=app.querySelector('[data-go="settings"]');if(se&&!app.querySelector('[data-go="funk"]'))cp(se,'funk','Funktionen','Jede Funktion ein- und ausschalten');
 }
 
+/* ---------- Mehr: klare Gruppen (höchstens 7 Einträge je Gruppe, Hick-Gesetz) ---------- */
+const MORE_GROUPS=[['Fortschritt',['stats','archiv','woche','analyse','rhythmus','profil','abzeichen']],
+  ['Lernhilfen',['lex','regeln','notizen','suche','fragenstand']],
+  ['Bewerbung',['ablauf','interview','ruhe','sport']],
+  ['App',['settings','funk','backup','methoden','info']]];
+function moreStructure(app){
+  if(app.querySelector('.list[data-mg]'))return;
+  const items={};app.querySelectorAll(':scope>.list>.li[data-go]').forEach(b=>{items[b.dataset.go]=b;});
+  if(!Object.keys(items).length)return;
+  const oldSecs=[...app.querySelectorAll(':scope>.sec,:scope>.list')];const anchor=oldSecs[0];if(!anchor)return;
+  const frag=document.createDocumentFragment(),used=new Set();
+  for(const [g,ks] of MORE_GROUPS){const bs=ks.map(k=>items[k]).filter(b=>b&&!b.hidden);if(!bs.length)continue;
+    const h=document.createElement('div');h.className='sec';h.textContent=g;const l=document.createElement('div');l.className='list';l.dataset.mg=g;
+    bs.forEach(b=>{used.add(b);l.appendChild(b);});frag.appendChild(h);frag.appendChild(l);}
+  const rest=Object.values(items).filter(b=>!used.has(b)&&!b.hidden);
+  if(rest.length){const h=document.createElement('div');h.className='sec';h.textContent='Weitere';const l=document.createElement('div');l.className='list';l.dataset.mg='Weitere';rest.forEach(b=>l.appendChild(b));frag.appendChild(h);frag.appendChild(l);}
+  anchor.before(frag);oldSecs.forEach(e=>e.remove());
+  const st=app.querySelector('[data-go="settings"] .tx>span');if(st)st.textContent='Helligkeit, Schrift, Vorlesen, Testtermin';
+  const setIc=(go,svg,cls)=>{const i=app.querySelector('[data-go="'+go+'"] .ic');if(i){i.innerHTML=svg;if(cls)i.className='ic '+cls;}};
+  setIc('archiv','<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9a2 2 0 002 2h10a2 2 0 002-2V9M10 13h4"/></svg>','c8');
+  setIc('funk','<svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="5"/><circle cx="16" cy="12" r="3"/></svg>','c3');
+}
+
 /* ---------- Tab-Leiste: aktiver Tab auch für neue und bisher fehlende Ansichten ---------- */
 {const TABX={funk:'more',archiv:'more',archivd:'more',ruhe:'more',abzeichen:'more',sport:'more',regeln:'learn'};
  const _rn=renderNav;renderNav=function(){_rn.apply(this,arguments);if(S)return;const t=TABX[view];if(!t)return;const bar=document.querySelector('[data-go="home"]')&&document.querySelector('[data-go="home"]').parentNode;if(!bar||bar.querySelector('.on'))return;
@@ -5719,7 +5742,7 @@ function moreAdd(app){
   const app=document.getElementById('app');if(!app)return;
   if(!S){
     if(view==='settings')setArrange(app);
-    if(view==='more')moreAdd(app);
+    if(view==='more'){moreAdd(app);fnHide(app);moreStructure(app);}
     if(view==='funk')fnFilter();
     fnHide(app);
   }
