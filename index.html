@@ -2,10 +2,24 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hzXrga71FtM1i3o9TYmRTOnHubyMzS+TdJ5OpVkGbJ0=' 'sha256-3xswfkFtckRRfkr+btNAFTdyh8wqxjtgZHr89Ey8XrI=' 'sha256-Y+n/hLNluV31i134qe0EeiNeG3ALVRcxdskKNKS+VwY=' 'sha256-Khk4Fep6QneqngYAlLIG3H888lQAbb171RDrdY81/tc=' 'sha256-a1ZchCAi9v3lroO6i7FR5YzsEf7qwv4EdjtGrDn+3Mc='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://generativelanguage.googleapis.com https://api.anthropic.com https://api.openai.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
+<meta name="theme-color" id="thc" content="#000000">
+<script>
+/* Helligkeitsstufe vor dem ersten Zeichnen setzen: kein heller Blitz beim Öffnen */
+(function(){try{
+  var BG={1:'#000000',2:'#000000',3:'#1C1C1E',4:'#E9E9EE',5:'#F2F2F7'};
+  var s=JSON.parse(localStorage.getItem('aufnahmetest-trainer-v2')||'null')||{};
+  var a=s.hsa||'aus',n=+s.hs||0;
+  if(!n){n=s.theme==='light'?5:2;}
+  if(a==='zeit'){var h=new Date().getHours();n=(h>=7&&h<18)?4:2;}
+  else if(a==='iphone'){n=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?2:4;}
+  if(!(n>=1&&n<=5))n=2;
+  var r=document.documentElement;r.setAttribute('data-hs',String(n));r.setAttribute('data-theme',n<=3?'dark':'light');
+  document.getElementById('thc').setAttribute('content',BG[n]);
+}catch(e){document.documentElement.setAttribute('data-hs','2');document.documentElement.setAttribute('data-theme','dark');}})();
+</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" href="icon-180.png">
@@ -1966,9 +1980,9 @@ function finishSession(timeout){
     const P=sessPoints();
     S.exam={areas,apct,total,totn,tot,pass:allok&&total>=70,unanswered:totn-S.res.length,pts:P};
     ST.exams.push({ts:Date.now(),total,areas:apct,pass:S.exam.pass,secs:S.secs,pts:P.got,ptsMax:P.max});
-    if(ST.exams.length>20)ST.exams.shift();save();
+    save();
   }
-  if(S.mode==='blitz'){ST.blitz=ST.blitz||[];ST.blitz.push({ts:Date.now(),ok:S.res.filter(r=>r.ok).length,n:S.res.length});if(ST.blitz.length>30)ST.blitz.shift();save();}
+  if(S.mode==='blitz'){ST.blitz=ST.blitz||[];ST.blitz.push({ts:Date.now(),ok:S.res.filter(r=>r.ok).length,n:S.res.length});save();}
   render();window.scrollTo(0,0);
 }
 function leaveSession(){
@@ -4493,7 +4507,7 @@ wa:'Nomen kannst du mit „der, die, das“ verbinden. Verben kannst du tun. Adj
 pass:'Passiv = werden + Partizip II. Im Perfekt wird aus „geworden“ ein **worden**: ist verhaftet worden.',
 konj:'Wünsche mit „wäre, hätte, käme“ (Konjunktiv II). Berichtetes mit „sei, habe, komme“ (Konjunktiv I).',
 gk:'Kannst du einen Artikel davorsetzen („beim Lesen“, „das Lesen“)? Dann groß. Nach heute, gestern, morgen: Tageszeit groß (heute Abend).',
-komma:'Vor dass, weil, obwohl und wenn kommt immer ein Komma. Vor „und“ und „oder“ in einer Aufzählung nie.',
+komma:'Vor Nebensätzen mit „dass“, „weil“, „obwohl“ oder „wenn“ steht ein Komma. Vor „und“ und „oder“ in einer Aufzählung steht keines.',
 dehn:'Kurz gesprochen: doppelt (Bett, Mitte). Lang gesprochen: h, ie oder Doppelvokal (Zahl, Liebe, Meer).',
 verw:'wieder = nochmals (wiederholen, mit ie). wider = gegen (widersprechen). seit = Zeit. seid = ihr seid.',
 br4:'„Mal, plus, gleicher Nenner“: 2 1/3 → 2·3 + 1 = 7, also 7/3.',
@@ -5336,6 +5350,385 @@ document.addEventListener('keydown',e=>{if(e.key!=='Tab')return;const x=document
   else if(e.shiftKey&&document.activeElement===a){e.preventDefault();z.focus();}
   else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus();}});
 
+})();
+</script>
+<style id="helligkeit">
+/* ===== Helligkeitsstufen 1–5 (Master-Prompt Modul A). Jede Stufe ist ein vollständiges Token-Set, Kontraste mit der WCAG-2.x-Formel berechnet ===== */
+:root[data-hs="1"]{--bg:#000000;--card:#121214;--card2:#1C1C1E;--ink:#E5E5EA;--ink2:#AEAEB2;--mute:#98989F;--sep:#2C2C2E;--track:#2C2C2E;
+  --tint:#4D9FFF;--tint-ink:#FFFFFF;--tint-bg:#0B1F38;--btn:#0A6CE0;--alt-ink:#6CB2FF;--ok:#30D158;--ok-bg:#0B2213;--bad:#FF7B73;--bad-bg:#2E1312;--warn:#FFD60A;--warn-bg:#2A2300;--star:#FFD60A;
+  --fill:rgba(118,118,128,.20);--bar:rgba(10,10,12,.82);--shadow:none;color-scheme:dark}
+:root[data-hs="1"].warm{--ink:#ECE4D8;--ink2:#BDB4A8;--mute:#A39B90}
+:root[data-hs="2"]{--bg:#000000;--card:#1C1C1E;--card2:#2C2C2E;--ink:#F5F5F7;--ink2:#C7C7CC;--mute:#A1A1A6;--sep:#38383A;--track:#3A3A3C;
+  --tint:#409CFF;--tint-ink:#FFFFFF;--tint-bg:#0B2747;--btn:#0A6CE0;--alt-ink:#5AA9FF;--ok:#30D158;--ok-bg:#0E2A17;--bad:#FF6961;--bad-bg:#3A1715;--warn:#FFD60A;--warn-bg:#332B00;--star:#FFD60A;
+  --fill:rgba(118,118,128,.24);--bar:rgba(22,22,24,.80);--shadow:none;color-scheme:dark}
+:root[data-hs="3"]{--bg:#1C1C1E;--card:#2C2C2E;--card2:#3A3A3C;--ink:#F2F2F7;--ink2:#D1D1D6;--mute:#B4B4BA;--sep:#48484A;--track:#48484A;
+  --tint:#64B0FF;--tint-ink:#FFFFFF;--tint-bg:#16314F;--btn:#0A6CE0;--alt-ink:#7DBDFF;--ok:#4ADE7B;--ok-bg:#133420;--bad:#FF8A82;--bad-bg:#45201D;--warn:#FFD60A;--warn-bg:#3A3104;--star:#FFD60A;
+  --fill:rgba(142,142,147,.24);--bar:rgba(36,36,38,.84);--shadow:none;color-scheme:dark}
+:root[data-hs="4"]{--bg:#E9E9EE;--card:#F4F4F6;--card2:#E9E9EE;--ink:#1D1D1F;--ink2:#3C3C43;--mute:#5C5C61;--sep:#C7C7CC;--track:#D8D8DD;
+  --tint:#0A5AC0;--tint-ink:#FFFFFF;--tint-bg:#DCE6F4;--btn:#0A5AC0;--alt-ink:#0A5AC0;--ok:#17702F;--ok-bg:#DCEEE1;--bad:#B3141A;--bad-bg:#F6E1E1;--warn:#7A4F00;--warn-bg:#F4EAD0;--star:#9A5A00;
+  --fill:rgba(118,118,128,.14);--bar:rgba(233,233,238,.82);--shadow:0 1px 2px rgba(0,0,0,.05);color-scheme:light}
+:root[data-hs="5"]{--bg:#F2F2F7;--card:#FFFFFF;--card2:#F2F2F7;--ink:#000000;--ink2:#3C3C43;--mute:#6C6C70;--sep:#C6C6C8;--track:#E5E5EA;
+  --tint:#0A5FC8;--tint-ink:#FFFFFF;--tint-bg:#E7EFFA;--btn:#0A5FC8;--alt-ink:#0A5FC8;--ok:#1B7F37;--ok-bg:#E8F5EC;--bad:#C4161C;--bad-bg:#FDECEC;--warn:#8A5A00;--warn-bg:#FFF4D6;--star:#B56B00;
+  --fill:rgba(118,118,128,.12);--bar:rgba(249,249,249,.78);--shadow:0 1px 2px rgba(0,0,0,.04);color-scheme:light}
+/* Mehr Kontrast bleibt in jeder Stufe wirksam */
+:root[data-hs].hc{--mute:color-mix(in srgb,var(--ink) 80%,var(--card));--sep:color-mix(in srgb,var(--ink) 45%,var(--card))}
+/* Bunte Übungskarten in dunklen Stufen: dunkle Basis, Farbe nur als Schimmer (Sättigung deutlich gedämpft), heller Text 6–9:1 */
+:root[data-hs="1"] :is(.bcard,.tcard),:root[data-hs="2"] :is(.bcard,.tcard),:root[data-hs="3"] :is(.bcard,.tcard){color:#F5F5F7;--hue:#5A8DEE;background:linear-gradient(120deg,#161618 0%,color-mix(in srgb,var(--hue) 42%,#141416) 100%);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.08)}
+:root[data-hs] :is(.bcard,.tcard).g1{--hue:#1E8BFF}:root[data-hs] :is(.bcard,.tcard).g2{--hue:#2D8CF0}:root[data-hs] :is(.bcard,.tcard).g3{--hue:#3AA7E8}
+:root[data-hs] :is(.bcard,.tcard).g4{--hue:#FF7A45}:root[data-hs] :is(.bcard,.tcard).g5{--hue:#F5B400}:root[data-hs] :is(.bcard,.tcard).g6{--hue:#8C6CF5}
+:root[data-hs] :is(.bcard,.tcard).g7{--hue:#F25C82}:root[data-hs] :is(.bcard,.tcard).g8{--hue:#43B05C}:root[data-hs] :is(.bcard,.tcard).g9{--hue:#C04FD6}:root[data-hs] :is(.bcard,.tcard).g10{--hue:#5A8DEE}
+:root[data-hs="1"] .bcard .bpat,:root[data-hs="2"] .bcard .bpat,:root[data-hs="3"] .bcard .bpat{opacity:.14}
+:root[data-hs="1"] :is(.bcard,.tcard) .art,:root[data-hs="2"] :is(.bcard,.tcard) .art,:root[data-hs="3"] :is(.bcard,.tcard) .art{opacity:.35}
+:root[data-hs="1"] .bcard :is(.bt,.bs,.barrow),:root[data-hs="2"] .bcard :is(.bt,.bs,.barrow),:root[data-hs="3"] .bcard :is(.bt,.bs,.barrow){color:#F5F5F7}
+:root[data-hs="1"] .tcard .tt,:root[data-hs="2"] .tcard .tt,:root[data-hs="3"] .tcard .tt{text-shadow:none}
+:root[data-hs="1"] .bcard,:root[data-hs="1"] .tcard{background:linear-gradient(120deg,#0E0E10 0%,color-mix(in srgb,var(--hue) 34%,#0E0E10) 100%)}
+/* Stufe 4: helle Karten ohne grelle Farben (Sättigung −30 %) */
+:root[data-hs="4"] :is(.bcard,.tcard){filter:saturate(.7)}
+/* Abdunkeln: nur Bilder, Figuren und Grafiken, nie Text (Wert 0–40 % kommt aus der Einstellung) */
+:root[data-hs] #app :is(img,canvas,video,.fig svg,.figs svg,.matrix svg,.art svg,.cube svg){filter:brightness(calc(1 - var(--dim,0)))}
+/* Sanfter Stufenwechsel (200 ms), bei reduzierter Bewegung sofort */
+:root.hs-fade body,:root.hs-fade .card,:root.hs-fade .top,:root.hs-fade .tabs,:root.hs-fade .bcard{transition:background-color 200ms linear,color 200ms linear}
+@media (prefers-reduced-motion:reduce){:root.hs-fade body,:root.hs-fade .card,:root.hs-fade .top,:root.hs-fade .tabs,:root.hs-fade .bcard{transition:none}}
+/* Einstellungen: Vorschau-Kacheln je Stufe */
+.hsgrid{display:flex;flex-direction:column;margin:8px 0 4px}
+.hsopt{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:6px 0;border:0;border-top:.5px solid var(--sep);background:none;cursor:pointer;color:var(--ink);font:inherit;text-align:left}
+.hsopt:first-child{border-top:0}
+.hsopt .sw{flex:0 0 44px;height:44px;border-radius:10px;padding:6px;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;box-shadow:inset 0 0 0 1px var(--sep)}
+.hsopt .sw i{display:block;height:6px;border-radius:3px}
+.hsopt .sw i:last-child{width:60%}
+.hsopt .tx2{flex:1 1 auto;min-width:0}
+.hsopt .tx2 small{display:block;color:var(--mute);font-size:13px}
+.hsopt .ck{flex:0 0 22px;color:var(--tint);font-weight:700;font-size:19px;visibility:hidden}
+.hsopt[aria-checked="true"] .ck{visibility:visible}
+.hsopt[aria-checked="true"] .sw{box-shadow:0 0 0 2px var(--tint)}
+.hsopt.auto-now .ck{visibility:visible;color:var(--mute)}
+.hsopt:focus-visible{outline:3px solid var(--tint);outline-offset:2px;border-radius:12px}
+.hsrange{width:100%;min-height:44px;accent-color:var(--tint)}
+/* Einstellungen: Suche und Gruppen */
+.setsearch{width:100%;min-height:44px;margin:4px 0 6px;padding:10px 14px;border-radius:12px;border:0;background:var(--fill);color:var(--ink);font:inherit;font-size:17px}
+.setsearch::placeholder{color:var(--mute)}
+.setgrp{margin:22px 4px 6px;font-size:13px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--mute)}
+.setnone{margin:16px 4px;color:var(--mute)}
+/* Funktionen (Schalter-Zentrale) */
+.fnrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:.5px solid var(--sep)}
+.fnrow:first-of-type{border-top:0}
+.fnrow>div:first-child{flex:1 1 auto;min-width:0}
+.fnrow .dep{color:var(--mute);font-size:13px}
+.fnprof{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px}
+.fnprof .btn{flex:1 1 auto;min-height:44px;margin:0}
+.fnask{background:var(--warn-bg);color:var(--ink);border-radius:12px;padding:12px 14px;margin:8px 0}
+/* Ergebnis-Archiv */
+.arow{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:56px;padding:10px 0;border:0;border-top:.5px solid var(--sep);background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.arow:first-of-type{border-top:0}
+.arow .ar-r{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.arow .ar-r::after{content:" ›";color:var(--mute);font-weight:400}
+.afilter{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}
+.afilter select{min-height:44px;border-radius:10px;border:0;background:var(--fill);color:var(--ink);font:inherit;padding:0 12px}
+.aq{padding:10px 0;border-top:.5px solid var(--sep)}
+.aq:first-of-type{border-top:0}
+.aq .st{font-weight:600}
+.aq .st.ok{color:var(--ok)}.aq .st.bad{color:var(--bad)}
+.anote{width:100%;min-height:72px;border-radius:12px;border:0;background:var(--fill);color:var(--ink);font:inherit;padding:10px 12px}
+.rsfix{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:20;max-width:600px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;background:var(--card);color:var(--ink);border-radius:16px;padding:12px 14px 12px 16px;box-shadow:0 8px 28px rgba(0,0,0,.28),inset 0 0 0 .5px var(--sep)}
+.rsfix .row{margin:0;gap:8px}.rsfix .btn{min-height:44px;margin:0}
+.tnum{font-variant-numeric:tabular-nums}
+/* Abzeichen: noch nicht erreicht = ruhige Farbe statt Transparenz (Text bleibt ≥ 4,5:1) */
+.bdg{opacity:1}.bdg:not(.on){box-shadow:inset 0 0 0 1px var(--sep)}.bdg:not(.on) :is(b,small){color:var(--mute)}.bdg:not(.on) .bi{filter:grayscale(1);opacity:.55}
+.sub,.note,.card p{hyphenate-limit-chars:12 5 5;-webkit-hyphenate-limit-before:5;-webkit-hyphenate-limit-after:5}
+</style>
+<script>
+/* ===================== Master-Prompt v3.5: Helligkeitsstufen, Einstellungen, Funktionen, Ergebnis-Archiv, Runde fortsetzen ===================== */
+(function(){
+/* ---------- Modul A · Helligkeitsstufen ---------- */
+const HS=[null,
+  {n:'Nacht',d:'am Abend und im Bett',bg:'#000000',card:'#121214',ink:'#E5E5EA'},
+  {n:'Graphit',d:'Empfehlung: dunkel und klar',bg:'#000000',card:'#1C1C1E',ink:'#F5F5F7'},
+  {n:'Dämmerung',d:'dunkelgrau, weicher Kontrast',bg:'#1C1C1E',card:'#2C2C2E',ink:'#F2F2F7'},
+  {n:'Tag gedämpft',d:'hell ohne grelles Weiß',bg:'#E9E9EE',card:'#F4F4F6',ink:'#1D1D1F'},
+  {n:'Hell',d:'wie bisher',bg:'#F2F2F7',card:'#FFFFFF',ink:'#000000'}];
+const mqDark=window.matchMedia?matchMedia('(prefers-color-scheme: dark)'):null;
+function hsMigrate(){if(!ST.hs){ST.hs=ST.theme==='light'?5:2;ST.hsa=ST.hsa||'aus';}if(ST.dim==null)ST.dim=0;}
+function hsNow(){
+  const a=ST.hsa||'aus';
+  if(a==='zeit'){const h=new Date().getHours();return (h>=7&&h<18)?4:2;}
+  if(a==='iphone')return mqDark&&mqDark.matches?2:4;
+  const n=+ST.hs;return n>=1&&n<=5?n:2;
+}
+function hsApply(fade){
+  hsMigrate();const n=hsNow(),r=document.documentElement;
+  if(fade&&r.getAttribute('data-hs')!==String(n)){r.classList.add('hs-fade');setTimeout(()=>r.classList.remove('hs-fade'),260);}
+  r.setAttribute('data-hs',String(n));r.setAttribute('data-theme',n<=3?'dark':'light');
+  r.classList.toggle('warm',n===1&&!!ST.warm);
+  r.style.setProperty('--dim',String(Math.max(0,Math.min(40,+ST.dim||0))/100));
+  const m=document.getElementById('thc');if(m)m.setAttribute('content',HS[n].bg);
+  ST.theme=n<=3?'dark':'light';
+}
+applyTheme=function(){applyFont();hsApply(false);};
+if(mqDark){try{mqDark.addEventListener('change',()=>{if((ST.hsa||'aus')==='iphone')hsApply(true);});}catch(e){}}
+setInterval(()=>{if((ST.hsa||'aus')==='zeit')hsApply(true);},60000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&(ST.hsa||'aus')!=='aus')hsApply(true);});
+function hsCard(){
+  hsMigrate();const cur=+ST.hs,a=ST.hsa||'aus',now=hsNow();
+  const tiles=HS.slice(1).map((s,i)=>{const n=i+1,on=a==='aus'&&cur===n,an=a!=='aus'&&n===now;
+    return `<button type="button" class="hsopt${an?' auto-now':''}" role="radio" aria-checked="${on}" tabindex="${(a==='aus'?on:n===now)?0:-1}" data-act="hs-set" data-v="${n}">
+    <span class="sw" style="background:${s.bg}" aria-hidden="true"><i style="background:${s.card}"></i><i style="background:${s.ink}"></i></span><span class="tx2">${n} · ${s.n}<small>${s.d}${an?' · jetzt durch Automatik aktiv':''}</small></span><span class="ck" aria-hidden="true">✓</span></button>`;}).join('');
+  const seg=[['aus','Aus'],['zeit','Nach Tageszeit'],['iphone','Wie iPhone']].map(([k,l])=>`<button data-act="hs-auto" data-v="${k}" class="${a===k?'on':''}" aria-pressed="${a===k}">${l}</button>`).join('');
+  const autoTxt=a==='zeit'?`Von 7 bis 18 Uhr Stufe 4, sonst Stufe 2. Jetzt aktiv: Stufe ${now} · ${HS[now].n}.`:a==='iphone'?`Folgt Hell/Dunkel des iPhones: Hell = Stufe 4, Dunkel = Stufe 2. Jetzt aktiv: Stufe ${now} · ${HS[now].n}.`:'Die gewählte Stufe gilt immer.';
+  return `<div class="card" id="hscard"><b>Helligkeit</b><p class="sub small" style="margin:4px 0 0">Fünf Stufen von sehr dunkel bis hell. Jede Stufe ist auf gute Lesbarkeit geprüft (Text mindestens 4,5:1).</p>
+  <div class="hsgrid" role="radiogroup" aria-label="Helligkeitsstufe">${tiles}</div>
+  <div class="fsrow"><div><div>Automatik</div><div class="sub small">${autoTxt}</div></div><div class="seg" role="group" aria-label="Automatik">${seg}</div></div>
+  <div class="fsrow"><div style="flex:1 1 100%"><label for="hsdim">Bilder abdunkeln: <span class="tnum" id="hsdimv">${+ST.dim||0} %</span></label><div class="sub small">Dunkelt nur Bilder und Figuren ab, nie Text.</div>
+  <input class="hsrange" type="range" id="hsdim" min="0" max="40" step="5" value="${+ST.dim||0}" aria-valuetext="${+ST.dim||0} Prozent"></div></div>
+  <div class="fsrow elswrow"><div><div>Nachtfarbe in Stufe 1</div><div class="sub small">Wärmere Schrift, weniger Blauanteil.</div></div><div class="seg" role="group" aria-label="Nachtfarbe in Stufe 1"><button data-act="hs-warm" data-v="1" class="${ST.warm?'on':''}" aria-pressed="${!!ST.warm}">An</button><button data-act="hs-warm" data-v="0" class="${ST.warm?'':'on'}" aria-pressed="${!ST.warm}">Aus</button></div></div></div>`;
+}
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-act^="hs-"]');if(!b)return;const a=b.dataset.act,v=b.dataset.v;
+  if(a==='hs-set'){ST.hs=+v;ST.hsa='aus';}
+  else if(a==='hs-auto'){ST.hsa=v;}
+  else if(a==='hs-warm'){ST.warm=v==='1'?1:0;}
+  save();hsApply(true);const f=a==='hs-set'?'[data-act="hs-set"][data-v="'+v+'"]':null;render();
+  if(f){const el=document.querySelector(f);if(el)el.focus({preventScroll:true});}
+});
+document.addEventListener('keydown',ev=>{
+  const b=ev.target.closest&&ev.target.closest('.hsopt');if(!b)return;
+  const k=ev.key;let n=+b.dataset.v;
+  if(k==='ArrowRight'||k==='ArrowDown')n=n%5+1;else if(k==='ArrowLeft'||k==='ArrowUp')n=(n+3)%5+1;else return;
+  ev.preventDefault();ev.stopPropagation();const t=document.querySelector('.hsopt[data-v="'+n+'"]');if(t)t.click();
+},true);
+document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='hsdim'){ST.dim=+ev.target.value;hsApply(false);const l=document.getElementById('hsdimv');if(l)l.textContent=ST.dim+' %';ev.target.setAttribute('aria-valuetext',ST.dim+' Prozent');}});
+document.addEventListener('change',ev=>{if(ev.target&&ev.target.id==='hsdim')save();});
+
+/* ---------- Modul P · Schalter-Zentrale ---------- */
+const FN_SET=[ // Schalter aus ST.set: [Schlüssel, Bereich, Name, Erklärung, Standard]
+  ['conf','Üben','„Wie sicher bist du?“','Fragt nach jeder Antwort, wie sicher du warst.',1],
+  ['frame','Üben','Farbiger Rahmen','Grün bei richtig, rot bei falsch.',1],
+  ['tips','Üben','Tipps beim Üben','Tipp 1, Tipp 2 und Lösungsweg.',1],
+  ['tts','Stimme','Vorlesen','Knopf zum Vorlesen, Stimme im Diktat.',1],
+  ['sound','Ton','Ton bei Antwort','Kurzer Ton bei richtig und falsch.',0],
+  ['sev','Ton','Ton bei Rundenende','Abschluss-Ton, bei Aufstieg eine kleine Melodie.',1],
+  ['anim','Bewegung','Animationen','Bewegung bei Ergebnis, Aufstieg und Wechsel der Ansicht.',1],
+  ['hapt','Haptik','Vibration (Experiment)','Inoffizieller iPhone-Trick, kann wegfallen.',0]];
+const FN_VIEW=[ // abschaltbare Bereiche: [Ansicht, Bereich, Name, Erklärung]. Kernfunktionen Üben, Prüfung und Speichern bleiben immer an
+  ['rep','Üben','Wiederholung','Fällige Fragen nach deinem Wiederholungsplan.'],['themen','Üben','Üben nach Themen','Thema und Unterthema selbst wählen.'],['regeln','Üben','Regel-Karten','Regeln, die aus deinen Fehlern entstehen.'],['marked','Üben','Markierte Fragen','Fragen, die du dir gemerkt hast.'],['kartei','Üben','Lernkartei','Karteikasten mit Fächern.'],['karten','Üben','Lernkarten','Wissen zum Umdrehen.'],['suche','Üben','Fragensuche','Fragen nach Stichwort finden.'],['diktat','Üben','Diktat-Übung','Rechtschreibung mit Vorlese-Stimme (nur Training, im Test gibt es kein Diktat).'],
+  ['stats','Statistik','Statistik','Trefferquote, Stufen, Lerntage.'],['analyse','Statistik','Meine Schwächen','Schwache Themen und Muster.'],['rhythmus','Statistik','Fehler-Rhythmus','Wann und wo du Fehler machst.'],['woche','Statistik','Wochenbericht','Besser, schwächer, Plan für die nächste Woche.'],['profil','Statistik','Mein Lernprofil','Lerntyp, Aufmerksamkeit, Strategie.'],['archiv','Statistik','Ergebnis-Archiv','Alle Runden mit Datum, Fragen und Notizen.'],
+  ['abzeichen','Motivation','Abzeichen','Serien und Abzeichen für echte Meilensteine.'],['notizen','Motivation','Fehler-Tagebuch','Eigene Notizen zu Fehlern.'],
+  ['ruhe','Wohlbefinden','Ruhig in den Test','Sorgen aufschreiben, Atmen, Testtag-Plan.'],['sport','Wohlbefinden','Fitness','Vorbereitung für Ergometrie und Grundausbildung.'],
+  ['interview','Gespräch','Aufnahmegespräch','Fragen und Tipps für das Gespräch.'],['ablauf','Planung','Ablauf und Checkliste','Testtage, Unterlagen, Checkliste.'],['fragenstand','Planung','Fragenstand','Wie viele Fragen es je Bereich gibt.'],['methoden','Info','Wie die App lernt','Die Studien hinter den Funktionen.']];
+const FN_DEP={sev:['sound'],diktat:['tts']}; // Funktion → braucht
+const FN_GROUPS=['Üben','Stimme','Ton','Bewegung','Haptik','Statistik','Motivation','Wohlbefinden','Gespräch','Planung','Info'];
+let FN_Q='',FN_ASK=null;
+const fnOff=()=>ST.off||(ST.off={});
+function fnIsOn(k){const s=FN_SET.find(x=>x[0]===k);if(s){if(k==='tips'||k==='sev')return !(ST.set&&ST.set[k]===0);return !!(ST.set&&ST.set[k]);}return !fnOff()[k];}
+function fnSetRaw(k,on){const s=FN_SET.find(x=>x[0]===k);ST.set=ST.set||{};if(s){ST.set[k]=on?1:0;}else{if(on)delete fnOff()[k];else fnOff()[k]=1;}}
+function fnName(k){const x=FN_SET.find(s=>s[0]===k)||FN_VIEW.find(s=>s[0]===k);return x?x[2]:k;}
+function fnDependents(k){return Object.keys(FN_DEP).filter(d=>FN_DEP[d].includes(k)&&fnIsOn(d));}
+function fnToggle(k,on,confirmed){
+  if(!on){const deps=fnDependents(k);if(deps.length&&!confirmed){FN_ASK={k,deps};render();return;}
+    ST.fnPrev=ST.fnPrev||{};ST.fnPrev[k]=deps;deps.forEach(d=>fnSetRaw(d,false));fnSetRaw(k,false);}
+  else{const need=(FN_DEP[k]||[]).filter(n=>!fnIsOn(n));need.forEach(n=>fnSetRaw(n,true));fnSetRaw(k,true);
+    const prev=(ST.fnPrev||{})[k];if(prev){prev.forEach(d=>fnSetRaw(d,true));delete ST.fnPrev[k];}}
+  FN_ASK=null;save();applyFont();try{elApply();}catch(e){}render();
+}
+const FN_ALL=()=>[...FN_SET.map(s=>s[0]),...FN_VIEW.map(v=>v[0])];
+const FN_STD=()=>{const o={};FN_SET.forEach(s=>o[s[0]]=!!s[4]);FN_VIEW.forEach(v=>o[v[0]]=true);return o;};
+const FN_PROF={
+  minimal:()=>{const o={};FN_ALL().forEach(k=>o[k]=false);o.conf=true;o.frame=true;o.tips=true;o.anim=true;o.rep=true;o.themen=true;o.archiv=true;return o;},
+  standard:FN_STD,
+  alles:()=>{const o={};FN_ALL().forEach(k=>o[k]=true);return o;}};
+function fnApplyProfile(o){FN_ALL().forEach(k=>{if(k in o)fnSetRaw(k,!!o[k]);});FN_ASK=null;save();applyFont();try{elApply();}catch(e){}render();}
+function fnSnapshot(){const o={};FN_ALL().forEach(k=>o[k]=fnIsOn(k));return o;}
+function fnRow(k,grp,name,desc){
+  const on=fnIsOn(k),need=(FN_DEP[k]||[]).map(fnName);
+  return `<div class="fnrow" data-fn="${esc((name+' '+desc+' '+grp).toLowerCase())}"><div><div>${esc(name)}</div><div class="sub small">${esc(desc)}${need.length?` <span class="dep">· braucht „${esc(need.join('“, „'))}“</span>`:''}</div></div>
+  <button type="button" class="elsw" role="switch" aria-checked="${on}" aria-label="${esc(name)}" data-act="fn-tog" data-k="${k}" data-v="${on?0:1}"><span class="elsw-t" aria-hidden="true"><span class="elsw-k"></span></span></button></div>`;
+}
+V7.funk=function(){
+  const rows={};FN_GROUPS.forEach(g=>rows[g]=[]);
+  FN_SET.forEach(([k,g,n,d])=>rows[g].push(fnRow(k,g,n,d)));
+  FN_VIEW.forEach(([k,g,n,d])=>rows[g].push(fnRow(k,g,n,d)));
+  const all=FN_ALL(),onN=all.filter(fnIsOn).length;
+  const ask=FN_ASK?`<div class="fnask" role="alertdialog" aria-labelledby="fnaskt"><b id="fnaskt">„${esc(fnName(FN_ASK.k))}“ ausschalten?</b><p class="sub small" style="margin:4px 0 8px">Damit geht auch aus: ${esc(FN_ASK.deps.map(fnName).join(', '))}. Beim Wiedereinschalten kommt alles zurück.</p><div class="row" style="margin:0"><button class="btn red sm" data-act="fn-yes">Ausschalten</button><button class="btn alt sm" data-act="fn-no">Abbrechen</button></div></div>`:'';
+  const prof=ST.fnProf;
+  return `<button class="back" data-go="settings">Einstellungen</button><h1 class="lt">Funktionen</h1>
+  <p class="sub">Schalte jede Funktion einzeln ein oder aus. Ausgeschaltet heißt: keine Anzeige, keine Hinweise. Deine Lerndaten bleiben dabei immer erhalten. Üben, Prüfung und Speichern bleiben immer an.</p>
+  <div class="card"><b>Was ist an?</b><p class="sub small" style="margin:4px 0 0"><span class="tnum">${onN}</span> von <span class="tnum">${all.length}</span> Funktionen sind eingeschaltet.</p>
+  <div class="fnprof" role="group" aria-label="Profile"><button class="btn alt sm" data-act="fn-prof" data-v="minimal">Minimal</button><button class="btn alt sm" data-act="fn-prof" data-v="standard">Standard</button><button class="btn alt sm" data-act="fn-prof" data-v="alles">Alles an</button>${prof?`<button class="btn alt sm" data-act="fn-prof" data-v="eigen">${esc(prof.name)}</button>`:''}</div>
+  <div class="row" style="margin:6px 0 0"><button class="btn alt sm" data-act="fn-save">${prof?'Eigenes Profil überschreiben':'Als eigenes Profil speichern'}</button></div>
+  <p class="sub small" style="margin:6px 0 0">Profile ändern nur Schalter, nie Lerndaten. „Standard“ ist die empfohlene Einstellung.</p></div>
+  ${ask}
+  <input type="search" class="setsearch" id="fnq" placeholder="Funktion suchen" aria-label="Funktion suchen" value="${esc(FN_Q)}" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+  ${FN_GROUPS.filter(g=>rows[g].length).map(g=>`<h2 class="setgrp">${esc(g)}</h2><div class="card fncard">${rows[g].join('')}</div>`).join('')}
+  <p class="setnone" id="fnnone" hidden>Keine Funktion gefunden.</p>`;
+};
+Object.assign(VT,{funk:'Funktionen',archiv:'Ergebnis-Archiv',archivd:'Ergebnis'});
+function fnFilter(){const q=FN_Q.trim().toLowerCase();let any=false;
+  document.querySelectorAll('.fnrow').forEach(r=>{const hit=!q||r.dataset.fn.includes(q);r.hidden=!hit;if(hit)any=true;});
+  document.querySelectorAll('.fncard').forEach(c=>{const v=[...c.querySelectorAll('.fnrow')].some(r=>!r.hidden);c.hidden=!v;const h=c.previousElementSibling;if(h&&h.classList.contains('setgrp'))h.hidden=!v;});
+  const n=document.getElementById('fnnone');if(n)n.hidden=any;}
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-act^="fn-"]');if(!b)return;const a=b.dataset.act;
+  if(a==='fn-tog'){fnToggle(b.dataset.k,b.dataset.v==='1',false);const t=document.querySelector('[data-act="fn-tog"][data-k="'+b.dataset.k+'"]');if(t)t.focus({preventScroll:true});else{const y=document.querySelector('[data-act="fn-yes"]');if(y)y.focus({preventScroll:true});}}
+  else if(a==='fn-yes'&&FN_ASK){const k=FN_ASK.k;fnToggle(k,false,true);const t=document.querySelector('[data-act="fn-tog"][data-k="'+k+'"]');if(t)t.focus({preventScroll:true});}
+  else if(a==='fn-no'){const k=FN_ASK&&FN_ASK.k;FN_ASK=null;render();const t=k&&document.querySelector('[data-act="fn-tog"][data-k="'+k+'"]');if(t)t.focus({preventScroll:true});}
+  else if(a==='fn-prof'){const v=b.dataset.v;fnApplyProfile(v==='eigen'?(ST.fnProf&&ST.fnProf.o)||{}:FN_PROF[v]());notice='Profil „'+(v==='eigen'?ST.fnProf.name:b.textContent)+'“ übernommen.';render();}
+  else if(a==='fn-save'){ST.fnProf={name:'Eigenes Profil',o:fnSnapshot()};save();notice='Eigenes Profil gespeichert.';render();}
+});
+document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='fnq'){FN_Q=ev.target.value;fnFilter();}});
+/* Ausgeschaltete Bereiche: nicht anzeigen und nicht öffnen */
+{const _go=go;go=function(v,arg){if(v&&fnOff()[v]&&FN_VIEW.some(x=>x[0]===v)){notice='„'+fnName(v)+'“ ist ausgeschaltet. Du kannst es hier wieder einschalten.';return _go('funk');}return _go(v,arg);};}
+function fnHide(app){const off=fnOff();Object.keys(off).forEach(k=>{if(!off[k])return;app.querySelectorAll('[data-go="'+k+'"]').forEach(el=>{el.hidden=true;el.setAttribute('aria-hidden','true');});});}
+
+/* ---------- Modul C · Einstellungen: Reihenfolge, Gruppen, Suche ---------- */
+let SET_Q='';
+const SET_ORDER=[['Lernen',['Testtag 1 (Datum)','Lern-Erinnerung im Kalender','Rückmeldung beim Üben']],
+  ['Vorlesen',['Hörbuch-Stimme (empfohlen)','Vorlesen und Diktat']],
+  ['Darstellung',['Helligkeit','Schriftgröße']],
+  ['Ton, Bewegung und Haptik',['Feinschliff: Bewegung, Ton, Haptik']],
+  ['Daten und KI',['Sichern und Laden','KI-Hilfe (eigener Schlüssel)']],
+  ['Funktionen',['Funktionen']],
+  ['Zurücksetzen',['Alles zurücksetzen']]];
+function setCards(){return `<div class="card"><b>Sichern und Laden</b><p class="sub small" style="margin:4px 0 8px">Automatische Sicherungen, Datei sichern und laden, Speicherstatus.</p><button class="btn alt sm" data-go="backup">Öffnen</button></div>
+  <div class="card"><b>Funktionen</b><p class="sub small" style="margin:4px 0 8px">Jede Funktion einzeln ein- und ausschalten, mit Profilen (Minimal, Standard, Alles an).</p><button class="btn alt sm" data-go="funk">Öffnen</button></div>`;}
+{const _vs=viewSettings;viewSettings=function(){let h=_vs.apply(this,arguments);
+  const i=h.indexOf('<div class="card"><b>Design</b>');if(i>=0){const j=h.indexOf('</div></div>',i);if(j>i)h=h.slice(0,i)+hsCard()+h.slice(j+12);}
+  return h+setCards();};}
+function setArrange(app){
+  if(app.querySelector('.setgrp'))return;
+  const cards=[...app.querySelectorAll(':scope>.card')];const title=c=>((c.querySelector('b')||{}).textContent||'').trim();
+  const used=new Set();const frag=document.createDocumentFragment();
+  const s=document.createElement('input');s.type='search';s.className='setsearch';s.id='setq';s.placeholder='Einstellungen durchsuchen';s.setAttribute('aria-label','Einstellungen durchsuchen');s.autocomplete='off';s.setAttribute('autocapitalize','off');s.spellcheck=false;s.setAttribute('enterkeyhint','search');s.value=SET_Q;frag.appendChild(s);
+  for(const [g,ts] of SET_ORDER){const cs=ts.map(t=>cards.find(c=>!used.has(c)&&title(c)===t)).filter(Boolean);if(!cs.length)continue;
+    const h=document.createElement('h2');h.className='setgrp';h.textContent=g;frag.appendChild(h);cs.forEach(c=>{used.add(c);c.dataset.grp=g;frag.appendChild(c);});}
+  const rest=cards.filter(c=>!used.has(c));
+  if(rest.length){const h=document.createElement('h2');h.className='setgrp';h.textContent='Weitere';frag.appendChild(h);rest.forEach(c=>{c.dataset.grp='Weitere';frag.appendChild(c);});}
+  const reset=cards.find(c=>title(c)==='Alles zurücksetzen');
+  if(reset&&reset!==frag.lastChild){const hr=[...frag.childNodes].find(n=>n.classList&&n.classList.contains('setgrp')&&n.textContent==='Zurücksetzen');if(hr){frag.appendChild(hr);frag.appendChild(reset);}}
+  const n=document.createElement('p');n.className='setnone';n.id='setnone';n.hidden=true;n.textContent='Keine Einstellung gefunden.';frag.appendChild(n);
+  const h1=app.querySelector(':scope>h1');(h1||app.firstChild).after(frag);
+  setFilter();
+}
+function setFilter(){const q=SET_Q.trim().toLowerCase();const app=document.getElementById('app');if(!app)return;let any=false;
+  const cards=[...app.querySelectorAll(':scope>.card')];
+  cards.forEach(c=>{const hit=!q||c.textContent.toLowerCase().includes(q);c.hidden=!hit;if(hit)any=true;});
+  app.querySelectorAll(':scope>.setgrp').forEach(h=>{h.hidden=!cards.some(c=>!c.hidden&&c.dataset.grp===h.textContent);});
+  const n=document.getElementById('setnone');if(n)n.hidden=any;}
+document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='setq'){SET_Q=ev.target.value;setFilter();}});
+
+/* ---------- Modul N · Ergebnis-Archiv ---------- */
+const AR_TYP={practice:'Üben',daily:'Smart-Training',smart:'Smart-Training',wrong:'Fehler üben',bm:'Markierte',focus:'Thema',exam:'Simulation',blitz:'Blitz',diktat:'Diktat-Übung',rep:'Wiederholung',turbo:'Fehler-Turbo'};
+let AR_F={typ:'',zeit:''},AR_DEL=null;
+function arList(){return ST.archiv||(ST.archiv=[]);}
+function arTyp(r){return AR_TYP[r.typ]||r.label||'Runde';}
+function arRecord(){
+  if(!S||S.archived||!S.res||!S.res.length)return;S.archived=true;
+  const mod={};S.res.forEach(r=>{const a=(r.area||(r.q&&CAT[r.q.cat]&&CAT[r.q.cat].area)||'andere');mod[a]=mod[a]||{n:0,ok:0};mod[a].n++;if(r.ok)mod[a].ok++;});
+  const qn=S.steps.filter(s=>s.k==='q').length,ok=S.res.filter(r=>r.ok).length;
+  let P=null;try{P=sessPoints();}catch(e){}
+  const rec={id:'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),typ:S.mode,label:S.label||'',start:S.t0,ende:Date.now(),dauer:S.secs||Math.round((Date.now()-S.t0)/1000),
+    n:S.res.length,ok,qn,pts:P?P.got:null,ptsMax:P?P.max:null,total:S.exam?S.exam.total:null,module:mod,abgebrochen:S.res.length<qn,
+    fragen:S.res.map(r=>({i:(r.q&&(r.q.id||(r.q.tid?'t:'+r.q.tid:'')))||'',t:String((r.q&&(r.q.q||r.q.text||r.q.frage))||'').replace(/<[^>]*>/g,'').slice(0,160),ok:r.ok?1:0,c:r.conf==null?-1:r.conf,ms:r.ms||0,h:r.help?1:0,g:typeof r.given==='string'||typeof r.given==='number'?String(r.given).slice(0,60):''})),
+    notiz:'',v:1};
+  const L=arList();L.push(rec);
+  let full=0;for(let i=L.length-1;i>=0;i--){if(L[i].fragen&&L[i].fragen.length){full++;if(full>200){L[i].fragen=L[i].fragen.filter(f=>!f.ok);L[i].komp=1;}}}
+  save();
+}
+{const _f=finishSession;finishSession=function(){const r=_f.apply(this,arguments);try{arRecord();}catch(e){}try{rsClear();}catch(e){}return r;};}
+const fmtD=t=>new Date(t).toLocaleString('de-AT',{day:'numeric',month:'numeric',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+const fmtDur=s=>{s=Math.round(s||0);const m=Math.floor(s/60);return m?m+' min '+String(s%60).padStart(2,'0')+' s':s+' s';};
+function arPct(r){return r.n?Math.round(100*r.ok/r.n):0;}
+function arFiltered(){const now=Date.now(),z={'7':7,'30':30}[AR_F.zeit];return arList().filter(r=>(!AR_F.typ||r.typ===AR_F.typ)&&(!z||now-r.ende<=z*864e5)).slice().reverse();}
+V7.archiv=function(){
+  const L=arList(),types=[...new Set(L.map(r=>r.typ))];const F=arFiltered();
+  const best={};L.forEach(r=>{Object.entries(r.module||{}).forEach(([a,x])=>{if(x.n>=5){const p=Math.round(100*x.ok/x.n);if(!best[a]||p>best[a].p)best[a]={p,t:r.ende};}});});
+  const areaName=a=>{const x=(typeof AREAS!=='undefined'?AREAS:[]).find(y=>y.id===a);return x?(x.n||x.name||x.t||a):a;};
+  return `<button class="back" data-go="more">Mehr</button><h1 class="lt">Ergebnis-Archiv</h1>
+  <p class="sub">Jede beendete Runde wird hier dauerhaft gespeichert. Nichts wird automatisch gelöscht.</p>
+  ${L.length?`<div class="afilter"><label class="sr" for="arT">Art</label><select id="arT" data-ar="typ"><option value="">Alle Arten</option>${types.map(t=>`<option value="${esc(t)}" ${AR_F.typ===t?'selected':''}>${esc(AR_TYP[t]||t)}</option>`).join('')}</select>
+  <label class="sr" for="arZ">Zeitraum</label><select id="arZ" data-ar="zeit"><option value="">Gesamter Zeitraum</option><option value="7" ${AR_F.zeit==='7'?'selected':''}>Letzte 7 Tage</option><option value="30" ${AR_F.zeit==='30'?'selected':''}>Letzte 30 Tage</option></select></div>
+  <div class="card">${F.length?F.map(r=>`<button type="button" class="arow" data-act="ar-open" data-id="${r.id}"><span><span>${esc(arTyp(r))}${r.abgebrochen?' · abgebrochen':''}</span><span class="sub small" style="display:block">${esc(fmtD(r.ende))} · ${r.n} Fragen · ${esc(fmtDur(r.dauer))}</span></span><span class="ar-r">${arPct(r)} %</span></button>`).join(''):'<p class="sub" style="margin:0">Keine Runde für diesen Filter.</p>'}</div>
+  ${Object.keys(best).length?`<h2 class="setgrp">Bestwerte je Bereich</h2><div class="card">${Object.entries(best).map(([a,x])=>`<div class="fnrow"><div>${esc(areaName(a))}</div><div class="tnum"><b>${x.p} %</b> <span class="sub small">${esc(new Date(x.t).toLocaleDateString('de-AT'))}</span></div></div>`).join('')}<p class="sub small" style="margin:6px 0 0">Gezählt ab 5 Fragen eines Bereichs in einer Runde.</p></div>`:''}
+  <div class="row"><button class="btn alt sm" data-act="ar-csv">Als Tabelle exportieren (CSV)</button></div>`
+  :`<div class="card"><b>Noch keine Runde gespeichert</b><p class="sub" style="margin:4px 0 8px">Sobald du eine Runde beendest, erscheint sie hier mit Datum, Dauer, Ergebnis und allen Fragen.</p><button class="btn" data-act="smart">Smart-Training starten</button></div>`}`;
+};
+V7.archivd=function(){
+  const r=arList().find(x=>x.id===viewArg);if(!r)return `<button class="back" data-go="archiv">Archiv</button><h1 class="lt">Ergebnis</h1><div class="card"><p class="sub" style="margin:0">Diese Runde gibt es nicht mehr.</p></div>`;
+  const bad=(r.fragen||[]).filter(f=>!f.ok).length;
+  return `<button class="back" data-go="archiv">Archiv</button><h1 class="lt">${esc(arTyp(r))}</h1>
+  <p class="sub">${esc(fmtD(r.start))} · ${esc(fmtDur(r.dauer))}${r.abgebrochen?' · abgebrochen':''}</p>
+  <div class="card"><div class="fnrow"><div>Richtig</div><div class="tnum"><b>${r.ok} von ${r.n}</b> (${arPct(r)} %)</div></div>${r.pts!=null?`<div class="fnrow"><div>Punkte</div><div class="tnum"><b>${r.pts}</b> von ${r.ptsMax}</div></div>`:''}${r.total!=null?`<div class="fnrow"><div>Simulation gesamt</div><div class="tnum"><b>${r.total} %</b></div></div>`:''}</div>
+  <h2 class="setgrp">Notiz</h2><div class="card"><label class="sr" for="arnote">Notiz zu dieser Runde</label><textarea class="anote" id="arnote" data-id="${r.id}" placeholder="z. B. müde, nach dem Dienst" spellcheck="true" autocapitalize="sentences">${esc(r.notiz||'')}</textarea></div>
+  <h2 class="setgrp">Fragen${r.komp?' (nur Fehler gespeichert)':''}</h2><div class="card">${(r.fragen||[]).map((f,i)=>`<div class="aq"><span class="st ${f.ok?'ok':'bad'}">${f.ok?'✓ Richtig':'✗ Falsch'}</span> <span class="sub small tnum">· ${(f.ms/1000).toFixed(1).replace('.',',')} s${f.h?' · mit Tipp':''}</span><div>${esc(f.t||('Frage '+(i+1)))}</div></div>`).join('')||'<p class="sub" style="margin:0">Keine Einzelfragen gespeichert.</p>'}</div>
+  <div class="row">${AR_DEL===r.id?`<button class="btn red sm" data-act="ar-del2" data-id="${r.id}">Ja, diese Runde löschen</button><button class="btn alt sm" data-act="ar-del0">Abbrechen</button>`:`<button class="btn alt sm" data-act="ar-del" data-id="${r.id}">Runde löschen</button>`}</div>
+  ${bad?`<p class="sub small">Tipp: Deine Fehler kommen automatisch in Wiederholung und Fehler-Turbo.</p>`:''}`;
+};
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('[data-act^="ar-"]');if(!b)return;const a=b.dataset.act;
+  if(a==='ar-open'){AR_DEL=null;go('archivd',b.dataset.id);}
+  else if(a==='ar-del'){AR_DEL=b.dataset.id;render();const y=document.querySelector('[data-act="ar-del2"]');if(y)y.focus();}
+  else if(a==='ar-del0'){AR_DEL=null;render();}
+  else if(a==='ar-del2'){try{snapNow('vor-Loeschen');}catch(e){}ST.archiv=arList().filter(x=>x.id!==b.dataset.id);AR_DEL=null;save();notice='Runde gelöscht. Eine Sicherung wurde vorher angelegt.';go('archiv');}
+  else if(a==='ar-csv'){const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+    const rows=[['Datum','Art','Fragen','Richtig','Prozent','Dauer (s)','Punkte','Abgebrochen','Notiz'].map(q).join(';')].concat(arList().map(r=>[new Date(r.ende).toISOString(),arTyp(r),r.n,r.ok,arPct(r),r.dauer,r.pts==null?'':r.pts,r.abgebrochen?'ja':'nein',r.notiz||''].map(q).join(';')));
+    const blob=new Blob(['﻿'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});const u=URL.createObjectURL(blob);const l=document.createElement('a');l.href=u;l.download='aufnahmetest-ergebnisse-'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);}
+});
+document.addEventListener('change',ev=>{const t=ev.target;if(t&&t.dataset&&t.dataset.ar){AR_F[t.dataset.ar]=t.value;render();const s=document.getElementById(t.id);if(s)s.focus();}});
+document.addEventListener('input',ev=>{const t=ev.target;if(t&&t.id==='arnote'){const r=arList().find(x=>x.id===t.dataset.id);if(r){r.notiz=t.value.slice(0,500);save();}}});
+
+/* ---------- Modul G · Runde fortsetzen (Üben; Simulationen nicht, wegen Zeitlimit) ---------- */
+const RS_KEY='aufnahmetest-runde';
+const RS_MODES=['practice','daily','wrong','bm','focus','smart','rep','turbo'];
+function rsClear(){try{localStorage.removeItem(RS_KEY);}catch(e){}}
+function rsSave(){
+  if(!S||S.done||!RS_MODES.includes(S.mode)||!S.res||!S.res.length)return;
+  try{const o={mode:S.mode,label:S.label,steps:S.steps,i:S.i,res:S.res,t0:S.t0,back:S.back,backArg:S.backArg,at:Date.now(),qn:S.steps.filter(s=>s.k==='q').length};
+    localStorage.setItem(RS_KEY,JSON.stringify(o));}catch(e){rsClear();}
+}
+function rsGet(){try{const o=JSON.parse(localStorage.getItem(RS_KEY)||'null');if(!o||!Array.isArray(o.steps)||!Array.isArray(o.res)||Date.now()-o.at>7*864e5)return null;return o;}catch(e){return null;}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')rsSave();});
+window.addEventListener('pagehide',rsSave);
+function rsBar(){const o=rsGet();if(!o||S)return '';
+  return `<div class="rsfix" id="rsbar" role="region" aria-label="Runde fortsetzen"><div><b>Runde fortsetzen?</b><div class="sub small">${esc(o.label||'Übung')} · Frage ${o.res.length+1} von ${o.qn}</div></div><div class="row"><button class="btn sm" data-act="rs-go">Fortsetzen</button><button class="btn alt sm" data-act="rs-no">Verwerfen</button></div></div>`;}
+function rsShow(){const old=document.getElementById('rsbar');if(old)old.remove();if(S||view!=='home')return;const h=rsBar();if(h)document.body.insertAdjacentHTML('beforeend',h);}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act^="rs-"]');if(!b)return;
+  if(b.dataset.act==='rs-no'){rsClear();render();return;}
+  const o=rsGet();if(!o){rsClear();render();return;}
+  try{stopTimers();S=Object.assign({mode:o.mode,label:o.label,steps:o.steps,i:o.i,res:o.res,cur:null,sel:null,t0:o.t0,memoLeft:0,events:[],done:false,confirmExit:false,back:o.back||'home',backArg:o.backArg||null});
+    rsClear();enterStep();render();window.scrollTo(0,0);}catch(e){S=null;rsClear();notice='Die Runde konnte nicht fortgesetzt werden.';render();}
+});
+
+/* ---------- Mehr: Einträge für Archiv und Funktionen ---------- */
+function moreAdd(app){
+  if(app.querySelector('[data-go="archiv"]'))return;
+  const cp=(ref,go,t,d)=>{const ic=ref.querySelector('.ic');ref.insertAdjacentHTML('afterend',li('data-go="'+go+'"',ic?ic.innerHTML:'',t,d,'',ic?ic.className.replace(/\bic\b/,'').trim():''));};
+  const st=app.querySelector('[data-go="stats"]');if(st)cp(st,'archiv','Ergebnis-Archiv','Alle Runden mit Datum, Fragen und Notizen');
+  const se=app.querySelector('[data-go="settings"]');if(se&&!app.querySelector('[data-go="funk"]'))cp(se,'funk','Funktionen','Jede Funktion ein- und ausschalten');
+}
+
+/* ---------- Tab-Leiste: aktiver Tab auch für neue und bisher fehlende Ansichten ---------- */
+{const TABX={funk:'more',archiv:'more',archivd:'more',ruhe:'more',abzeichen:'more',sport:'more',regeln:'learn'};
+ const _rn=renderNav;renderNav=function(){_rn.apply(this,arguments);if(S)return;const t=TABX[view];if(!t)return;const bar=document.querySelector('[data-go="home"]')&&document.querySelector('[data-go="home"]').parentNode;if(!bar||bar.querySelector('.on'))return;
+   const b=bar.querySelector('[data-go="'+t+'"]');if(b){b.classList.add('on');b.setAttribute('aria-current','page');}};}
+
+/* ---------- Zusammenführen ---------- */
+{const _r=render;render=function(){
+  _r.apply(this,arguments);
+  const app=document.getElementById('app');if(!app)return;
+  if(!S){
+    if(view==='settings')setArrange(app);
+    if(view==='more')moreAdd(app);
+    if(view==='funk')fnFilter();
+    fnHide(app);
+  }
+  else if(!S.done){rsSave();}
+  app.querySelectorAll('button').forEach((bt,i)=>{if(!bt.textContent.trim()&&!bt.getAttribute('aria-label')&&bt.querySelector('svg')){const k=bt.dataset.i;bt.setAttribute('aria-label',k!=null?'Antwort '+'ABCDEFGH'[+k]:'Bild-Antwort');bt.querySelectorAll('svg').forEach(g=>g.setAttribute('aria-hidden','true'));}});
+  app.querySelectorAll('svg[role="img"]:not([aria-label]):not([aria-labelledby]):not([aria-hidden="true"])').forEach(g=>{if(!g.querySelector('title'))g.setAttribute('aria-label','Abbildung zur Aufgabe');});
+  rsShow();
+};}
+/* Zurücksetzen behält Helligkeit und Schalter-Einstellungen nicht als Lerndaten, sondern als Darstellung */
+{const keep=()=>({hs:ST.hs,hsa:ST.hsa,dim:ST.dim,warm:ST.warm});let K=null;
+ document.addEventListener('click',ev=>{if(ev.target.closest('[data-act="doreset"]'))K=keep();},true);
+ document.addEventListener('click',ev=>{if(K&&ev.target.closest('[data-act="doreset"]')){Object.assign(ST,K);K=null;rsClear();save();applyTheme();render();}});}
+hsMigrate();applyTheme();render();
 })();
 </script>
 </body>
