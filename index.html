@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-3Hce2F1UvbrCqZypAHnU3Qk/8+AqjqjfgleXueYqnLM=' 'sha256-3xswfkFtckRRfkr+btNAFTdyh8wqxjtgZHr89Ey8XrI=' 'sha256-Y+n/hLNluV31i134qe0EeiNeG3ALVRcxdskKNKS+VwY=' 'sha256-Khk4Fep6QneqngYAlLIG3H888lQAbb171RDrdY81/tc=' 'sha256-hkRb25+llDqOwYTg2fNfU4qlyEcZqQcUu1xJT0Gn8io='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://generativelanguage.googleapis.com https://api.anthropic.com https://api.openai.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-3Hce2F1UvbrCqZypAHnU3Qk/8+AqjqjfgleXueYqnLM=' 'sha256-3xswfkFtckRRfkr+btNAFTdyh8wqxjtgZHr89Ey8XrI=' 'sha256-Y+n/hLNluV31i134qe0EeiNeG3ALVRcxdskKNKS+VwY=' 'sha256-Khk4Fep6QneqngYAlLIG3H888lQAbb171RDrdY81/tc=' 'sha256-j3+d1brFevnL5T/83EwD+sn9DZXjhzwcgJKITTrgWEk='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://generativelanguage.googleapis.com https://api.anthropic.com https://api.openai.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="thc" content="#000000">
@@ -5484,6 +5484,12 @@ document.addEventListener('keydown',e=>{if(e.key!=='Tab')return;const x=document
 .hero .hact .btn:focus-visible{outline:3px solid #FFCC00;outline-offset:3px}
 .hero .hact .hlink{background:none;border:0;padding:12px 4px;min-height:44px;color:#fff;font:inherit;font-size:17px;font-weight:500;cursor:pointer}
 .hero .hact .hlink::after{content:" ›"}
+.hero .gring{flex:0 0 84px;width:84px;height:84px;border-radius:50%;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;background:conic-gradient(#FFCC00 calc(var(--p,0)*1%),rgba(255,255,255,.2) 0)}
+.hero .gring::before{content:"";position:absolute;inset:7px;border-radius:50%;background:#0B3478}
+.hero .gring>*{position:relative}.hero .gring b{font-size:24px;line-height:1;font-variant-numeric:tabular-nums}.hero .gring small{font-size:12px;opacity:.9;margin-top:2px}
+.hero .hact .btn.hsec{background:rgba(255,255,255,.16);color:#fff}
+.hlist{margin:0 0 12px}
+.hstat b{overflow-wrap:anywhere}
 .hstats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 12px}
 .hstat{background:var(--card);border-radius:16px;padding:12px 12px 10px;box-shadow:var(--shadow);border:0;font:inherit;color:var(--ink);text-align:left;min-height:76px;display:flex;flex-direction:column;justify-content:space-between}
 button.hstat{cursor:pointer}
@@ -5793,8 +5799,9 @@ function moreStructure(app){
 }
 
 /* ---------- Lernweg: Gruppen statt Einzel-Überschriften ---------- */
-function homeStructure(app){
-  const lw=app.querySelector(':scope>.lw');if(!lw||lw.dataset.st)return;lw.dataset.st='1';
+function homeStructure(app){const lw=app.querySelector(':scope>.lw');if(lw)homeStructure2(lw);}
+function homeStructure2(lw){
+  if(!lw||lw.dataset.st)return;lw.dataset.st='1';
   const kids=[...lw.children];
   // Bereichs-Überschriften: Logik bleibt (4 Themen), die übrigen Einzelbereiche werden zu „Weitere Testbereiche“
   let sawLogik=false,addedRest=false;
@@ -5809,38 +5816,73 @@ function homeStructure(app){
   lw.querySelectorAll(':scope>.lwsec').forEach(h=>{const t=h.textContent.trim();if(subs[t]&&!h.querySelector('small'))h.insertAdjacentHTML('beforeend','<small>'+subs[t]+'</small>');});
 }
 
-/* ---------- Startseite: Hero, Kennzahlen, ruhiger Trainer ---------- */
+/* ---------- Startseite „Heute“ (Bauplan aus der Recherche: 1 Haupt-Aktion, 3 Kennzahlen, Fällig/Schwäche, Themen in „Üben“) ---------- */
+const HIC={clock:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',stats:'<svg viewBox="0 0 24 24"><path d="M5 20V11M12 20V5M19 20v-7"/></svg>',chk:'<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',grid:'<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>'};
 function homeHero(app){
   if(app.querySelector(':scope>.hero'))return;
   const sh=app.querySelector(':scope>.shead'),coach=app.querySelector(':scope>.coach');if(!sh||!coach)return;
-  const ring=sh.querySelector('.sring'),logo=sh.querySelector('.slogo'),cnt=sh.querySelector('.scount b');
+  const logo=sh.querySelector('.slogo'),ringOld=sh.querySelector('.sring'),cnt=sh.querySelector('.scount b');
+  const einst=parseInt(((ringOld&&ringOld.querySelector('b'))||{}).textContent)||0;
   const smart=coach.querySelector('[data-act="smart"]'),prof=coach.querySelector('[data-go="profil"]');
   const first=coach.querySelector('ul.why li');
-  const d=new Date();const ds=d.toLocaleDateString('de-AT',{weekday:'long',day:'numeric',month:'long'});
-  const h=document.createElement('div');h.className='hhead';
-  h.innerHTML=`<div><div class="hdate">${esc(ds)}</div><h1>Lernweg</h1></div>`;if(logo)h.appendChild(logo);
-  const hero=document.createElement('section');hero.className='hero';hero.setAttribute('aria-label','Heute');
-  const head=first?first.textContent.trim():'Dein Training für heute';
-  hero.innerHTML=`<div class="hk">Heute</div><div class="hrow"><div class="htx"><h2>${esc(head)}</h2><p class="hs2">Smart-Training · etwa 15 Minuten · passt sich dir an</p></div></div><div class="hact"></div>`;
-  if(ring){const pc=parseInt((ring.querySelector('b')||{}).textContent)||0;ring.style.setProperty('--p',pc);ring.className='sring';hero.querySelector('.hrow').appendChild(ring);}
+  const goal=Math.max(1,+ST.goal||20),done=todayN(),gp=Math.min(100,Math.round(100*done/goal));
+  let days=null;if(ST.tdate){const t=new Date(ST.tdate+'T00:00');days=Math.ceil((t-new Date(new Date().toDateString()))/864e5);}
+  const fresh=!(ST.log&&ST.log.length);
+  // Zustand des Hero
+  let k='Dein nächster Schritt',h2=first?first.textContent.trim():'Dein Training für heute',sub=`${done} von ${goal} Aufgaben heute · passt sich dir an`,btn='Weiter lernen',btnAct='smart',sec=false;
+  if(fresh){k='Willkommen';h2='In wenigen Minuten weißt du, wo du stehst.';sub='Einstufung · alle Testbereiche kennenlernen';btn='Einstufung starten';}
+  else if(days!==null&&days<0){k='Testtag vorbei';h2='Wie ist es gelaufen?';sub='Trag ein neues Datum ein, wenn noch ein Termin kommt.';btn='Testtermin ändern';btnAct='go:settings';}
+  else if(days!==null&&days<=7){k=days===0?'Heute ist Testtag':'Noch '+days+(days===1?' Tag':' Tage');h2=days===0?'Ruhig bleiben, du bist vorbereitet.':'Zeit für einen Probedurchgang.';sub=days===0?'Nur kurz aufwärmen, kein neuer Stoff.':'Prüfungssimulation mit Zeitlimit wie im Test';btn=days===0?'Ruhig in den Test':'Simulation starten';btnAct=days===0?'go:ruhe':'go:exam';}
+  else if(done>=goal){k='Tagesziel erreicht';h2='Stark. Pause ist auch Training.';sub=`${done} Aufgaben heute · morgen geht's weiter`;btn='Noch eine Runde';sec=true;}
+  const d=new Date(),ds=d.toLocaleDateString('de-AT',{weekday:'long',day:'numeric',month:'long'});
+  const hh=document.createElement('div');hh.className='hhead';hh.innerHTML=`<div><div class="hdate">${esc(ds)}</div><h1>Lernweg</h1></div>`;if(logo)hh.appendChild(logo);
+  const hero=document.createElement('section');hero.className='hero';hero.setAttribute('aria-label','Dein nächster Schritt');
+  hero.innerHTML=`<div class="hk">${esc(k)}</div><div class="hrow"><div class="htx"><h2>${esc(h2)}</h2><p class="hs2">${esc(sub)}</p></div>
+    <div class="gring" role="img" aria-label="Tagesziel: ${done} von ${goal} Aufgaben" style="--p:${gp}"><b>${done}</b><small>von ${goal}</small></div></div><div class="hact"></div>`;
   const act=hero.querySelector('.hact');
-  if(smart){smart.className='btn';smart.textContent='Weiter lernen';act.appendChild(smart);}
-  if(prof){prof.className='hlink';act.appendChild(prof);}
-  // Kennzahlen
-  let days='–',dl='Testtermin eintragen',dgo=true;
-  if(ST.tdate){const t=new Date(ST.tdate+'T00:00');const n=Math.ceil((t-new Date(new Date().toDateString()))/864e5);if(n>=0){days=String(n);dl=n===1?'Tag bis Testtag 1':'Tage bis Testtag 1';dgo=false;}}
+  let mainBtn;if(btnAct==='smart'&&smart){mainBtn=smart;}else{mainBtn=document.createElement('button');mainBtn.type='button';if(btnAct.startsWith('go:'))mainBtn.dataset.go=btnAct.slice(3);else mainBtn.dataset.act=btnAct;}
+  mainBtn.className='btn'+(sec?' hsec':'');mainBtn.textContent=btn;act.appendChild(mainBtn);
+  if(btnAct!=='smart'&&smart){smart.className='hlink';smart.textContent='Weiter lernen';act.appendChild(smart);}
+  else if(prof){prof.className='hlink';act.appendChild(prof);}
+  // drei Kennzahlen: Tage bis Test · Bereitschaft · Serie (alle antippbar)
+  let R=null;try{R=readiness();}catch(e){}
+  const bLab=v=>v<.5?'Am Anfang':v<.65?'Auf dem Weg':v<.8?'Fast bereit':'Bereit';
+  const bVal=R&&R.enough?bLab(R.total):einst+' %',bSub=R&&R.enough?'Bereitschaft':'Einstufung';
   let sr=0;try{sr=streak();}catch(e){}
+  const dVal=days===null?'–':days<0?'–':String(days),dSub=days===null?'Testtermin eintragen':days<0?'Testtag vorbei':days===1?'Tag bis zum Test':'Tage bis zum Test';
   const st=document.createElement('div');st.className='hstats';
-  st.innerHTML=`<div class="hstat"><b>${esc((cnt&&cnt.textContent)||'0')}</b><span>Fragen sicher</span></div>`+
-    (dgo?`<button type="button" class="hstat" data-go="settings"><b>${days}</b><span>${dl}</span></button>`:`<div class="hstat"><b>${days}</b><span>${dl}</span></div>`)+
-    `<div class="hstat"><b>${sr}</b><span>${sr===1?'Tag in Folge':'Tage in Folge'}</span></div>`;
-  sh.replaceWith(h);h.after(hero);hero.after(st);
+  st.innerHTML=`<button type="button" class="hstat" data-go="settings"><b>${dVal}</b><span>${dSub}</span></button>`+
+    `<button type="button" class="hstat" data-go="analyse"><b>${esc(bVal)}</b><span>${bSub}</span></button>`+
+    `<button type="button" class="hstat" data-go="abzeichen"><b>${sr}</b><span>${sr===1?'Tag in Folge':'Tage in Folge'}</span></button>`;
+  // Fällig · Schwächstes Thema · Fragen sicher
+  let due=0;try{due=dueCount();}catch(e){}
+  const w=R&&R.weakest,wName=w&&AREA[w.id]?AREA[w.id].t:'';
+  const lst=document.createElement('div');lst.className='list hlist';
+  lst.innerHTML=li('data-go="rep"',HIC.clock,due?`${due} ${due===1?'Wiederholung':'Wiederholungen'} fällig`:'Nichts fällig',due?'Jetzt wiederholen, solange es frisch ist':'Lust auf dein schwächstes Thema?','','c2')+
+    li('data-go="analyse"',HIC.stats,wName&&w.n?'Schwächstes Thema: '+wName:'Schwächstes Thema',wName&&w.n?Math.round(100*w.score)+' % · gezielt üben':'Noch zu wenig Daten','','c5')+
+    li('data-go="stats"',HIC.chk,'Fragen sicher',((cnt&&cnt.textContent)||'0')+' · Statistik ansehen','','c3');
+  sh.replaceWith(hh);hh.after(hero);hero.after(st);st.after(lst);
   const srh=app.querySelector(':scope>h1.sr');if(srh)srh.remove();
-  // Trainer-Karte: ruhiger, Anleitung zum Aufklappen
+  // Trainer: ruhig, Anleitung zum Aufklappen
   coach.classList.add('hc2');const ht=document.createElement('div');ht.className='hc2t';ht.textContent='Dein Trainer';coach.prepend(ht);
-  const tip=coach.querySelector('.ctip');if(tip){const dd=document.createElement('details');const b=tip.querySelector('b');dd.innerHTML='<summary>'+esc(b?b.textContent:'So nutzt du den Trainer')+'</summary>';if(b)b.remove();dd.appendChild(tip);coach.appendChild(dd);}
+  const tip=coach.querySelector('.ctip');if(tip){const dd=document.createElement('details');const bb=tip.querySelector('b');dd.innerHTML='<summary>'+esc(bb?bb.textContent:'So nutzt du den Trainer')+'</summary>';if(bb)bb.remove();dd.appendChild(tip);coach.appendChild(dd);}
   const tl=coach.querySelector('.cohead .linkb');if(tl&&!ST.tdate){const p=document.createElement('p');p.className='sub small';p.style.margin='4px 0 0';p.appendChild(tl);p.append(' für einen Plan bis zum Test');coach.appendChild(p);}
+  // Themenlisten: Platz in „Üben“, hier nur ein Link
+  const lw=app.querySelector(':scope>.lw');
+  if(lw){const l2=document.createElement('div');l2.className='list hlist';l2.innerHTML=li('data-act="alltopics"',HIC.grid,'Alle Testthemen','10 Themen, Gespräch und Wissen · jetzt unter „Üben“','','c8');lw.replaceWith(l2);}
 }
+/* Themen in „Üben“ */
+function learnTopics(app){
+  if(app.querySelector('.lw'))return;
+  const t=document.createElement('div');try{t.innerHTML=viewHome();}catch(e){return;}
+  const lw=t.querySelector('.lw');if(!lw)return;
+  const anchor=[...app.querySelectorAll(':scope>h2.sec.elg')].find(h=>/Prüfen/.test(h.textContent));
+  const h=document.createElement('h2');h.className='sec elg';h.id='themen-liste';h.textContent='Testthemen';
+  if(anchor){anchor.before(h);h.after(lw);}else{app.appendChild(h);app.appendChild(lw);}
+  const sec=lw.querySelector('.lwsec');if(sec)sec.remove();
+  homeStructure2(lw);
+}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act="alltopics"]');if(!b)return;go('learn');setTimeout(()=>{const h=document.getElementById('themen-liste');if(h)h.scrollIntoView({block:'start'});},60);});
 
 /* ---------- Tab-Leiste: aktiver Tab auch für neue und bisher fehlende Ansichten ---------- */
 {const TABX={funk:'more',archiv:'more',archivd:'more',ruhe:'more',abzeichen:'more',sport:'more',regeln:'learn'};
@@ -5854,7 +5896,8 @@ function homeHero(app){
   if(!S){
     if(view==='settings')setArrange(app);
     if(view==='more'){moreAdd(app);fnHide(app);moreStructure(app);}
-    if(view==='home'){homeHero(app);homeStructure(app);}
+    if(view==='home'){homeStructure(app);homeHero(app);}
+    if(view==='learn')learnTopics(app);
     if(view==='funk')fnFilter();
     fnHide(app);
   }
