@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-3Hce2F1UvbrCqZypAHnU3Qk/8+AqjqjfgleXueYqnLM=' 'sha256-3xswfkFtckRRfkr+btNAFTdyh8wqxjtgZHr89Ey8XrI=' 'sha256-Y+n/hLNluV31i134qe0EeiNeG3ALVRcxdskKNKS+VwY=' 'sha256-Khk4Fep6QneqngYAlLIG3H888lQAbb171RDrdY81/tc=' 'sha256-cnm17EnUMNItfhmeCbUtfh4YfBETN7+LLsqY55I1e+g='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://generativelanguage.googleapis.com https://api.anthropic.com https://api.openai.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-3Hce2F1UvbrCqZypAHnU3Qk/8+AqjqjfgleXueYqnLM=' 'sha256-3xswfkFtckRRfkr+btNAFTdyh8wqxjtgZHr89Ey8XrI=' 'sha256-Y+n/hLNluV31i134qe0EeiNeG3ALVRcxdskKNKS+VwY=' 'sha256-Khk4Fep6QneqngYAlLIG3H888lQAbb171RDrdY81/tc=' 'sha256-g08t2vpoLRQqHOQMmjb2kxJoyWX2uyBUx+vv0vgi6qw='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://generativelanguage.googleapis.com https://api.anthropic.com https://api.openai.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="thc" content="#000000">
@@ -5435,6 +5435,34 @@ document.addEventListener('keydown',e=>{if(e.key!=='Tab')return;const x=document
 /* Abzeichen: noch nicht erreicht = ruhige Farbe statt Transparenz (Text bleibt ≥ 4,5:1) */
 .bdg{opacity:1}.bdg:not(.on){box-shadow:inset 0 0 0 1px var(--sep)}.bdg:not(.on) :is(b,small){color:var(--mute)}.bdg:not(.on) .bi{filter:grayscale(1);opacity:.55}
 .sub,.note,.card p{hyphenate-limit-chars:12 5 5;-webkit-hyphenate-limit-before:5;-webkit-hyphenate-limit-after:5}
+
+/* ===== Lernweg: Themen als ruhige, gruppierte Liste (iOS-Stil) statt 16 großer Farbflächen ===== */
+.lwlist{background:var(--card);border-radius:14px;overflow:hidden;margin:6px 0 4px;box-shadow:var(--shadow)}
+:root[data-hs] .lw .tcard,.lw .tcard{display:flex;align-items:center;gap:14px;width:100%;min-height:64px;margin:0;padding:10px 40px 12px 14px;border-radius:0;background:var(--card)!important;color:var(--ink);box-shadow:none;filter:none;text-align:left;overflow:visible}
+.lw .tcard+.tcard::before{content:"";position:absolute;top:0;left:68px;right:0;border-top:.5px solid var(--sep)}
+.lw .tcard::after{content:"›";position:absolute;right:16px;top:50%;transform:translateY(-52%);font-size:22px;color:var(--mute)}
+.lw .tcard .art{position:static;flex:0 0 40px;width:40px;height:40px;border-radius:10px;padding:6px 4px;opacity:1;display:flex;align-items:center;justify-content:center}
+.lw .tcard .art svg{width:100%;height:100%}
+.lw .tcard.a-logik .art{background:linear-gradient(135deg,#0B3A82,#1E6FD9)}.lw .tcard.a-raum .art{background:linear-gradient(135deg,#183C6B,#2F7FBF)}
+.lw .tcard.a-konz .art{background:linear-gradient(135deg,#0E4C5A,#1C8C9E)}.lw .tcard.a-merk .art{background:linear-gradient(135deg,#2B2F7A,#5258C7)}
+.lw .tcard.a-text .art{background:linear-gradient(135deg,#1F4F3A,#2E8A63)}.lw .tcard.a-sprache .art{background:linear-gradient(135deg,#5A2A6E,#9046B0)}
+.lw .tcard.a-tag2 .art{background:linear-gradient(135deg,#7A2E1E,#C2532F)}.lw .tcard.a-wissen .art{background:linear-gradient(135deg,#3D3F46,#6A6E78)}
+.lw .tcard .art:empty{display:none}
+:root[data-hs] .lw .tcard .art{opacity:1}
+.lw .tcard .tcx{max-width:none;flex:1 1 auto;min-width:0;flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:1px 0}
+.lw .tcard .tt{flex:1 0 100%;order:1}.lw .tcard .td{order:2}
+.lw .tcard .tn{order:3;font-size:13px;font-weight:400;opacity:1;color:var(--mute);letter-spacing:0}
+.lw .tcard *{text-shadow:none!important}
+.lw .tcard .tn::before{content:"\00a0·\00a0"}
+.lw .tcard.a-tag2 .tn{order:0;flex:1 0 100%}.lw .tcard.a-tag2 .tn::before{content:none}
+.lw .tcard .tt{font-size:17px;font-weight:600;line-height:1.25;margin:0;text-shadow:none;color:var(--ink);letter-spacing:-.01em}
+.lw .tcard .td{font-size:13px;color:var(--mute)}
+.lw .tcard .tbar{left:68px;right:16px;bottom:5px;height:3px;border-radius:2px;background:var(--track)}
+.lw .tcard .tbar i{background:var(--ok);border-radius:2px}
+.lw .tcard:active{background:var(--fill)!important;transform:none}
+.lw .tcard:focus-visible{outline:3px solid var(--tint);outline-offset:-3px;border-radius:14px}
+.lwsec{margin:28px 2px 4px}
+.lwsec small{display:block;font-size:15px;font-weight:400;color:var(--mute);letter-spacing:0;margin-top:2px}
 </style>
 <script>
 /* ===================== Master-Prompt v3.5: Helligkeitsstufen, Einstellungen, Funktionen, Ergebnis-Archiv, Runde fortsetzen ===================== */
@@ -5731,6 +5759,23 @@ function moreStructure(app){
   setIc('funk','<svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="5"/><circle cx="16" cy="12" r="3"/></svg>','c3');
 }
 
+/* ---------- Lernweg: Gruppen statt Einzel-Überschriften ---------- */
+function homeStructure(app){
+  const lw=app.querySelector(':scope>.lw');if(!lw||lw.dataset.st)return;lw.dataset.st='1';
+  const kids=[...lw.children];
+  // Bereichs-Überschriften: Logik bleibt (4 Themen), die übrigen Einzelbereiche werden zu „Weitere Testbereiche“
+  let sawLogik=false,addedRest=false;
+  kids.forEach(k=>{if(!k.classList.contains('lwsub'))return;const t=k.textContent.trim();
+    if(!sawLogik&&/^Logik/.test(t)){sawLogik=true;return;}
+    if(!addedRest){k.textContent='Weitere Testbereiche';addedRest=true;}else k.remove();});
+  // aufeinanderfolgende Karten in eine gruppierte Liste legen
+  let grp=null;[...lw.children].forEach(k=>{
+    if(k.classList.contains('tcard')){if(!grp){grp=document.createElement('div');grp.className='lwlist';k.before(grp);}grp.appendChild(k);}
+    else grp=null;});
+  const subs={'Testtag 1 · Computertest':'10 Themen wie im echten Test','Testtag 2 · Gespräch und Untersuchung':'Aufnahmegespräch und Ablauf','Wissen für Bewerbung und Gespräch':'4 Wissensbereiche für das Gespräch'};
+  lw.querySelectorAll(':scope>.lwsec').forEach(h=>{const t=h.textContent.trim();if(subs[t]&&!h.querySelector('small'))h.insertAdjacentHTML('beforeend','<small>'+subs[t]+'</small>');});
+}
+
 /* ---------- Tab-Leiste: aktiver Tab auch für neue und bisher fehlende Ansichten ---------- */
 {const TABX={funk:'more',archiv:'more',archivd:'more',ruhe:'more',abzeichen:'more',sport:'more',regeln:'learn'};
  const _rn=renderNav;renderNav=function(){_rn.apply(this,arguments);if(S)return;const t=TABX[view];if(!t)return;const bar=document.querySelector('[data-go="home"]')&&document.querySelector('[data-go="home"]').parentNode;if(!bar||bar.querySelector('.on'))return;
@@ -5743,6 +5788,7 @@ function moreStructure(app){
   if(!S){
     if(view==='settings')setArrange(app);
     if(view==='more'){moreAdd(app);fnHide(app);moreStructure(app);}
+    if(view==='home')homeStructure(app);
     if(view==='funk')fnFilter();
     fnHide(app);
   }
