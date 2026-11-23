@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hzXrga71FtM1i3o9TYmRTOnHubyMzS+TdJ5OpVkGbJ0=' 'sha256-3xswfkFtckRRfkr+btNAFTdyh8wqxjtgZHr89Ey8XrI=' 'sha256-Y+n/hLNluV31i134qe0EeiNeG3ALVRcxdskKNKS+VwY=' 'sha256-Khk4Fep6QneqngYAlLIG3H888lQAbb171RDrdY81/tc=' 'sha256-a1ZchCAi9v3lroO6i7FR5YzsEf7qwv4EdjtGrDn+3Mc='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://generativelanguage.googleapis.com https://api.anthropic.com https://api.openai.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-ockqF7l6mLpRBx16h8CtDjdRmLjcbeAYv1GVbxDXxus=' 'sha256-3xswfkFtckRRfkr+btNAFTdyh8wqxjtgZHr89Ey8XrI=' 'sha256-Y+n/hLNluV31i134qe0EeiNeG3ALVRcxdskKNKS+VwY=' 'sha256-Khk4Fep6QneqngYAlLIG3H888lQAbb171RDrdY81/tc=' 'sha256-+VOs9KRMzS76KLIRXDTFIf8ct/hVdZC3CbUPoN1AcEY='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://generativelanguage.googleapis.com https://api.anthropic.com https://api.openai.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="thc" content="#000000">
@@ -12,7 +12,7 @@
   var BG={1:'#000000',2:'#000000',3:'#1C1C1E',4:'#E9E9EE',5:'#F2F2F7'};
   var s=JSON.parse(localStorage.getItem('aufnahmetest-trainer-v2')||'null')||{};
   var a=s.hsa||'aus',n=+s.hs||0;
-  if(!n){n=s.theme==='light'?5:2;}
+  if(s.hsv!==2){n=5;a='aus';}
   if(a==='zeit'){var h=new Date().getHours();n=(h>=7&&h<18)?4:2;}
   else if(a==='iphone'){n=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?2:4;}
   if(!(n>=1&&n<=5))n=2;
@@ -5442,12 +5442,12 @@ document.addEventListener('keydown',e=>{if(e.key!=='Tab')return;const x=document
 /* ---------- Modul A · Helligkeitsstufen ---------- */
 const HS=[null,
   {n:'Nacht',d:'am Abend und im Bett',bg:'#000000',card:'#121214',ink:'#E5E5EA'},
-  {n:'Graphit',d:'Empfehlung: dunkel und klar',bg:'#000000',card:'#1C1C1E',ink:'#F5F5F7'},
+  {n:'Graphit',d:'dunkel und klar',bg:'#000000',card:'#1C1C1E',ink:'#F5F5F7'},
   {n:'Dämmerung',d:'dunkelgrau, weicher Kontrast',bg:'#1C1C1E',card:'#2C2C2E',ink:'#F2F2F7'},
   {n:'Tag gedämpft',d:'hell ohne grelles Weiß',bg:'#E9E9EE',card:'#F4F4F6',ink:'#1D1D1F'},
-  {n:'Hell',d:'wie bisher',bg:'#F2F2F7',card:'#FFFFFF',ink:'#000000'}];
+  {n:'Hell',d:'Standard: weiß und klar',bg:'#F2F2F7',card:'#FFFFFF',ink:'#000000'}];
 const mqDark=window.matchMedia?matchMedia('(prefers-color-scheme: dark)'):null;
-function hsMigrate(){if(!ST.hs){ST.hs=ST.theme==='light'?5:2;ST.hsa=ST.hsa||'aus';}if(ST.dim==null)ST.dim=0;}
+function hsMigrate(){if(ST.hsv!==2){ST.hs=5;ST.hsa='aus';ST.hsv=2;}if(ST.dim==null)ST.dim=0;} // Standard: Stufe 5 „Hell“ (Wunsch von Marco)
 function hsNow(){
   const a=ST.hsa||'aus';
   if(a==='zeit'){const h=new Date().getHours();return (h>=7&&h<18)?4:2;}
@@ -5725,7 +5725,7 @@ function moreAdd(app){
   rsShow();
 };}
 /* Zurücksetzen behält Helligkeit und Schalter-Einstellungen nicht als Lerndaten, sondern als Darstellung */
-{const keep=()=>({hs:ST.hs,hsa:ST.hsa,dim:ST.dim,warm:ST.warm});let K=null;
+{const keep=()=>({hs:ST.hs,hsa:ST.hsa,hsv:ST.hsv,dim:ST.dim,warm:ST.warm});let K=null;
  document.addEventListener('click',ev=>{if(ev.target.closest('[data-act="doreset"]'))K=keep();},true);
  document.addEventListener('click',ev=>{if(K&&ev.target.closest('[data-act="doreset"]')){Object.assign(ST,K);K=null;rsClear();save();applyTheme();render();}});}
 hsMigrate();applyTheme();render();
