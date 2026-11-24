@@ -19,7 +19,9 @@ const AREA_IC={
  text:'<path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/>',
  sprache:'<path d="M4 20l6-16h2l6 16M7 14h8"/>'
 };
-const AREA_COL={logik:['#EAF1FB','#0A5FC8'],raum:['#FFF3D6','#8A5A00'],konz:['#E6F6EC','#17702F'],merk:['#F0EBFF','#5B3FD6'],text:['#E7F6FA','#0E6A80'],sprache:['#FDECEF','#B3261E']};
+const AREA_COL_L={logik:['#EAF1FB','#0A5FC8'],raum:['#FFF3D6','#8A5A00'],konz:['#E6F6EC','#17702F'],merk:['#F0EBFF','#5B3FD6'],text:['#E7F6FA','#0E6A80'],sprache:['#FDECEF','#B3261E']};
+const AREA_COL_D={logik:['#16314F','#7DB8FF'],raum:['#3A2E0A','#FFC95C'],konz:['#123222','#5FDB8A'],merk:['#2A2150','#B9A8FF'],text:['#0F3038','#6CD3EA'],sprache:['#43191C','#FF8A82']};
+let AREA_COL=AREA_COL_L;
 const SHORT={logik:'Logik',raum:'Räumlich',konz:'Konzentration',merk:'Merkfähigkeit',text:'Textverständnis',sprache:'Sprache'};
 const ICO=(p,s)=>`<svg viewBox="0 0 24 24" width="${s||22}" height="${s||22}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
 const I={
@@ -40,7 +42,7 @@ const I={
 /* ================= Zustand ================= */
 function fresh(){return {v:1,upd:0,name:'',test:'',onb:false,acct:'local',theme:'weiss',
  tts:{eng:'hb',cv:'buttery',sex:'w',rate:1,hl:true},ki:true,round:'alle',
- sp:{},mk:{},rk:{},arch:[],conf:true,gkey:'',rem:'18:00',qs:{},notes:{},wg:[],log:[],days:{},lv:{},sc:{},plan:null,iv:{},chk:{},lex:{},ex:[],einst:null,psg:{},dk:{n:0,ok:0}};}
+ sp:{},mk:{},rk:{},arch:[],conf:true,gkey:'',rem:'18:00',qs:{},notes:{},wg:[],log:[],days:{},lv:{},sc:{},plan:null,iv:{},chk:{},lex:{},ex:[],blitz:[],einst:null,psg:{},dk:{n:0,ok:0}};}
 let ST=(()=>{try{const s=JSON.parse(localStorage.getItem(SKEY)||'null');if(s&&s.v===1)return Object.assign(fresh(),s);}catch(e){}return fresh();})();
 let storeOK=true;
 function save(){ST.upd=Date.now();try{localStorage.setItem(SKEY,JSON.stringify(ST));storeOK=true;}catch(e){storeOK=false;}cloudQueue();}
@@ -230,7 +232,7 @@ function authView(){
 }
 
 /* ================= Entwickler-Bereich (nur Konten mit Rolle "dev") ================= */
-const APPV='2026.11.24';
+const APPV='2026.11.24.2';
 const isDev=()=>!!(A.user&&A.user.app_metadata&&A.user.app_metadata.role==='dev');
 let DEVS=null;
 function devView(){
@@ -343,7 +345,8 @@ function back(){const p=stack.pop();if(p){V=p;}else{V.view=V.tab;V.arg=null;}sto
 function tab(t){ruStop();K=null;stack.length=0;V.tab=t;V.view=t;V.arg=null;stopSpeak();render();window.scrollTo(0,0);}
 
 /* ================= Rendering ================= */
-function applyTheme(){document.documentElement.setAttribute('data-th',ST.theme||'weiss');}
+const TH_BG={weiss:'#F5F5F7',hell:'#E9E9EE',dunkel:'#1C1C1E',schwarz:'#000000'};
+function applyTheme(){const t=ST.theme||'weiss';if(document.documentElement.getAttribute('data-th')===t)return;document.documentElement.setAttribute('data-th',t);AREA_COL=(t==='dunkel'||t==='schwarz')?AREA_COL_D:AREA_COL_L;const m=document.querySelector('meta[name=theme-color]');if(m)m.setAttribute('content',TH_BG[t]||'#F5F5F7');}
 function nav(){
   const t=[['home','Heute',I.home],['learn','Lernen',I.learn],['know','Wissen',I.know],['me','Profil',I.me]];
   return `<nav class="tabbar" aria-label="Hauptmenü">${t.map(([id,l,ic])=>`<button data-a="tab" data-v="${id}" class="${V.tab===id?'on':''}" ${V.tab===id?'aria-current="page"':''}>${ICO(ic)}<span>${l}</span></button>`).join('')}</nav>`;
@@ -351,16 +354,18 @@ function nav(){
 function head(title,sub,backLabel){
   return `${backLabel?`<button class="back" data-a="back">${ICO(I.back,20)}<span>${H(backLabel)}</span></button>`:''}<h1 class="lt">${H(title)}</h1>${sub?`<p class="lead">${sub}</p>`:''}`;
 }
+let LASTKEY='',SKEY2='';
 function render(){
   applyTheme();
   if(!ST.onb&&!S&&V.view!=='auth'){app.innerHTML=onbView();document.body.className='onb';return;}
-  if(S){document.body.className='sess';app.innerHTML=sessView();afterSess();plRender();return;}
+  if(S){LASTKEY='';const k2='s'+S.i;const an=k2!==SKEY2;SKEY2=k2;document.body.className='sess'+(an?' va':'');app.innerHTML=sessView();afterSess();plRender();return;}
   document.body.className=ST.onb?'':'onb';
   const v=V.view;let h='';
   try{
     h=({home:homeView,learn:learnView,know:knowView,me:meView,area:areaView,scenes:scenesView,passages:passView,lex:lexView,kquiz:kquizView,iv:ivView,dk:dkView,chk:chkView,sport:sportView,auth:authView,dev:devView,ausw:auswView,archiv:archView,notizen:notesView,markiert:markView,suche:suchView,karten:kartView,regeln:regelView,ablauf:ablaufView,methoden:methView,info:infoView,ruhe:ruheView,stats:statsView,data:dataView,result:resultView})[v]();
   }catch(e){h=`<div class="card"><b>Fehler beim Anzeigen</b><p class="sub">${H(e.message)}</p><button class="btn" data-a="tab" data-v="home">Zur Startseite</button></div>`;console.error(e);}
-  app.innerHTML=`<main class="wrap">${h}</main>${nav()}`;
+  const key=v+'|'+(V.arg||'')+'|'+(V.seg||'');const anim=key!==LASTKEY;LASTKEY=key;
+  app.innerHTML=`<main class="wrap${anim?' va':''}">${h}</main>${nav()}`;
   refreshAcct();plRender();
 }
 
@@ -441,6 +446,7 @@ function learnView(){
     <button class="tile" data-a="due" ${due?'':'disabled'}>${ICO(I.redo,22)}<b>Wiederholen</b><span>${due?due+' fällig':'Nichts fällig'}</span></button>
     <button class="tile" data-a="wrong" ${wr?'':'disabled'}>${ICO(I.warn,22)}<b>Fehler</b><span>${wr?wr+' offen':'Keine offen'}</span></button>
    </div>
+   <button class="banner blitz" data-a="blitz"><b>Blitzrunde · 3 Minuten</b><span>So viele Rechen-, Logik- und Raumaufgaben wie möglich.${ST.blitz.length?' Bestwert: '+ST.blitz.reduce((a,b)=>Math.max(a,b.ok),0)+' richtige.':''}</span>${ICO(I.chev,18)}</button>
    ${ST.einst?'':`<button class="banner" data-a="einst"><b>Einstufung machen</b><span>8 Minuten, danach passt sich der Tagesplan an dich an.</span>${ICO(I.chev,18)}</button>`}
    <div class="sec">6 Testbereiche</div>
    <div class="list">${AREAS.map(a=>{const s=areaScore(a.id);const [bg,fg]=AREA_COL[a.id];return `<button class="li" data-a="go" data-v="area" data-x="${a.id}"><span class="ic" style="background:${bg};color:${fg}">${ICO(AREA_IC[a.id],20)}</span><span class="tx"><b>${H(a.t)}</b><span class="track sm"><i style="width:${s||0}%;background:${s==null?'transparent':s>=70?'var(--ok)':s>=50?'var(--tint)':'var(--amber)'}"></i></span></span><span class="val">${s==null?'–':s+' %'}</span></button>`;}).join('')}</div>`;
@@ -647,6 +653,8 @@ function statsView(){
    <div class="card"><div class="ch"><b>Letzte 14 Tage</b><span class="sub">${days.reduce((s,x)=>s+x[1],0)} Antworten</span></div>
    <div class="bars" role="img" aria-label="Antworten pro Tag">${days.map(([d,n])=>`<div class="bc"><i style="height:${Math.round(100*n/mx)}%"></i><small>${d.toLocaleDateString('de-AT',{weekday:'narrow'})}</small></div>`).join('')}</div></div>
    <div class="card"><table class="tb st"><tr><th>Bereich</th><th>Antw.</th><th>Quote</th><th>Bereit</th></tr>${AREAS.map(a=>{const E=ST.log.filter(e=>e.a===a.id);const q=E.length?Math.round(100*E.reduce((s,e)=>s+e.o,0)/E.length):null;const s=areaScore(a.id);return `<tr><td>${SHORT[a.id]}</td><td>${E.length}</td><td>${q==null?'–':q+' %'}</td><td><b>${s==null?'–':s+' %'}</b></td></tr>`;}).join('')}</table></div>
+   <div class="sec">Lernkartei</div>${(()=>{const all=Object.keys(QBYID).length,b=[0,0,0,0,0,0];let seen=0;for(const id in ST.qs){if(!QBYID[id])continue;seen++;b[Math.min(5,ST.qs[id].b|0)]++;}const mx=Math.max(1,...b);const lb=['Neu gelernt','1 Tag','3 Tage','1 Woche','2 Wochen','Sicher'];return `<div class="card"><div class="ch"><b>Fragenstand</b><span class="sub">${seen} von ${all} gesehen</span></div><div class="track"><i style="width:${Math.round(100*seen/Math.max(1,all))}%"></i></div><div class="boxes">${b.map((n,i)=>`<div class="srow"><span>Fach ${i} · ${lb[i]}</span><span class="bx"><i style="width:${Math.round(100*n/mx)}%"></i></span><b>${n}</b></div>`).join('')}</div><p class="fine left">Richtig beantwortete Fragen wandern ein Fach weiter und kommen später wieder. Falsche starten bei Fach 0.</p></div>`;})()}
+   ${ST.blitz.length?`<div class="sec">Blitzrunden</div><div class="card"><div class="srow"><span>Bestwert</span><b>${ST.blitz.reduce((a,b)=>Math.max(a,b.ok),0)} richtige</b></div><div class="srow"><span>Gespielt</span><b>${ST.blitz.length}×</b></div><div class="srow"><span>Letzte</span><b>${ST.blitz[ST.blitz.length-1].ok}/${ST.blitz[ST.blitz.length-1].n}</b></div></div>`:''}
    <div class="sec">Simulationen</div>${ST.ex.length?`<div class="card">${ST.ex.slice().reverse().slice(0,10).map(e=>`<div class="srow"><span>${new Date(e.t).toLocaleDateString('de-AT')}</span><b>${e.ok}/${e.n} · ${e.p} %</b></div>`).join('')}</div>`:'<p class="sub pad">Noch keine Simulation gemacht.</p>'}`;
 }
 function dataView(){
@@ -795,21 +803,25 @@ document.addEventListener('keydown',e=>{if(!ZV.el)return;if(e.key==='Escape'){zv
 function start(title,items,mode,meta){
   items=items.filter(Boolean);if(!items.length){toast('Gerade keine Aufgaben verfügbar.');return;}
   stopSpeak();
-  S={qt:Date.now(),sel:null,title,items,i:0,mode:mode||'learn',meta:meta||{},res:[],ans:false,given:null,t0:Date.now(),end:mode==='exam'?Date.now()+EXAM_MIN*60000:0,zoom:false};
+  S={qt:Date.now(),sel:null,title,items,i:0,mode:mode||'learn',meta:meta||{},res:[],ans:false,given:null,t0:Date.now(),end:mode==='exam'?Date.now()+EXAM_MIN*60000:mode==='blitz'?Date.now()+BLITZ_SEC*1000:0,zoom:false};
   const it=S.items[0];if(it.k==='scene'||it.k==='memo')S.stud=Date.now()+(it.k==='scene'?it.sc.secs:it.m.secs)*1000;
   render();window.scrollTo(0,0);startTick();
 }
 let tick=null;
 function startTick(){clearInterval(tick);tick=setInterval(()=>{
   if(!S){clearInterval(tick);return;}
-  if(S.end){const r=Math.max(0,S.end-Date.now());const el=document.getElementById('clk');if(el)el.textContent=mmss(r/1000);if(el)el.classList.toggle('low',r<300000);if(r<=0){finish();return;}}
+  if(S.end){const r=Math.max(0,S.end-Date.now());const el=document.getElementById('clk');if(el)el.textContent=mmss(r/1000);if(el)el.classList.toggle('low',r<(S.mode==='blitz'?30000:300000));if(r<=0){finish();return;}}
   const it=S.items[S.i];
   if(it&&(it.k==='scene'||it.k==='memo')&&S.stud){const r=Math.max(0,S.stud-Date.now());const el=document.getElementById('stud');if(el){el.textContent=mmss(Math.ceil(r/1000));const b=document.getElementById('studbar');if(b)b.style.width=(100*r/((it.k==='scene'?it.sc.secs:it.m.secs)*1000))+'%';}if(r<=0){S.stud=0;nextItem();}}
 },250);}
 const mmss=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+const BLITZ_SEC=180;
+function blitzItems(){const c=['zr','ma','ab','zr','ma','ko'];const out=[];for(let i=0;i<24;i++){const k=i%6===5?'rv':c[i%c.length];out.push(...genPick(k,1));}return out.map(q=>Q(q));}
+function flash(ok){let el=document.getElementById('flash');if(!el){el=document.createElement('div');el.id='flash';el.setAttribute('aria-hidden','true');document.body.appendChild(el);}el.className=ok?'ok':'bad';el.textContent=ok?'✓':'✕';void el.offsetWidth;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),450);}
 function qCount(){return S.items.filter(x=>x.k==='q').length;}
 function qIndex(){return S.items.slice(0,S.i+1).filter(x=>x.k==='q').length;}
 function sessHead(){
+  if(S.mode==='blitz'){const ok=S.res.filter(r=>r.ok).length,el=Math.min(1,(Date.now()-S.t0)/(BLITZ_SEC*1000));return `<div class="shead"><button class="cbtn" data-a="quit" aria-label="Runde beenden">${ICO(I.x,18)}</button><div class="track lg"><i style="width:${Math.round(100*el)}%"></i></div><span class="cnt" aria-label="${ok} richtig von ${S.res.length}">✓ ${ok}/${S.res.length}</span><span class="clk" id="clk">${mmss((S.end-Date.now())/1000)}</span></div>`;}
   const n=qCount(),k=Math.min(n,qIndex());
   return `<div class="shead"><button class="cbtn" data-a="quit" aria-label="Runde beenden">${ICO(I.x,18)}</button><div class="track lg"><i style="width:${n?Math.max(0,Math.round(100*(k-(S.ans?0:1))/n)):0}%"></i></div><span class="cnt">${k}/${n}</span>${S.end?`<span class="clk" id="clk">${mmss((S.end-Date.now())/1000)}</span>`:''}</div>`;
 }
@@ -876,7 +888,7 @@ function isOk(q,g){
   if(q.t==='text')return (q.ans||[]).some(a=>nrm(a)===nrm(g));
   return false;
 }
-const useConf=()=>ST.conf&&S&&S.mode!=='exam';
+const useConf=()=>ST.conf&&S&&S.mode!=='exam'&&S.mode!=='blitz';
 function confRow(){return `<div class="conf"><span class="fine left">Wie sicher bist du?</span><div class="confb"><button class="btn sm" data-a="conf" data-f="2">Sicher</button><button class="btn sm alt" data-a="conf" data-f="1">Eher sicher</button><button class="btn sm alt" data-a="conf" data-f="0">Geraten</button></div></div>`;}
 function answer(g,f){
   if(!S||S.ans)return;S.f=f;const it=S.items[S.i],q=it.q;
@@ -886,6 +898,7 @@ function answer(g,f){
   record(q,ok,it);
   try{navigator.vibrate&&navigator.vibrate(ok?15:[30,40,30]);}catch(e){}
   if(S.mode==='exam'){nextItem();return;}
+  if(S.mode==='blitz'){flash(ok);nextItem();return;}
   render();
   const fb=document.getElementById('fb');if(fb){fb.focus({preventScroll:true});fb.scrollIntoView({behavior:'smooth',block:'nearest'});}
 }
@@ -900,11 +913,12 @@ function record(q,ok,it){
   ST.days[dk()]=(ST.days[dk()]||0)+1;
   if(q.id&&QBYID[q.id]){const r=ST.qs[q.id]||{b:0,n:0,w:0};r.n++;if(ok){r.b=Math.min(5,r.b+1);r.due=Date.now()+BOXD[r.b]*DMS;}else{r.b=0;r.w++;r.due=Date.now()+DMS/2;}ST.qs[q.id]=r;}
   else if(!q.id&&q.cat!=='sz'){if(!ok){const c=Object.assign({},q);delete c.o;delete c.ci;delete c.area;ST.wg.unshift(c);ST.wg=ST.wg.slice(0,30);}else if(it&&it.wgi!=null){ST.wg=ST.wg.filter(x=>x!==it.wgref);}}
-  if(q.cat&&GEN[q.cat])adapt(q.cat);
+  if(q.cat&&GEN[q.cat]&&!(S&&S.mode==='blitz'))adapt(q.cat);
   save();
 }
 function nextItem(){
   stopSpeak();zvClose();
+  if(S.mode==='blitz'&&S.i>=S.items.length-3)S.items.push(...blitzItems());
   if(S.i>=S.items.length-1){finish();return;}
   S.i++;S.ans=false;S.given=null;S.zoom=false;S.sel=null;S.qt=Date.now();
   const it=S.items[S.i];
@@ -918,6 +932,7 @@ function finish(){
   const res={title:S.title,mode:S.mode,ok,n,R,items:S.items,meta:S.meta,dur:Date.now()-S.t0};
   if(S.mode==='plan'&&S.meta.unit!=null){const P=plan();if(!P.done.includes(S.meta.unit))P.done.push(S.meta.unit);}
   if(S.mode==='einst'){ST.einst={t:Date.now(),ok,n};ST.plan=null;}
+  if(S.mode==='blitz'){res.best=ST.blitz.reduce((a,b)=>Math.max(a,b.ok),0);ST.blitz.push({t:Date.now(),ok,n:R.length});ST.blitz=ST.blitz.slice(-50);}
   if(S.mode==='exam')ST.ex.push({t:Date.now(),ok,n,p:Math.round(100*ok/n)});
   if(R.length){ST.arch.unshift({t:Date.now(),title:S.title,mode:S.mode,ok,n:R.length,dur:Date.now()-S.t0,R:R.map(x=>({q:String(x.q.q).slice(0,220),ok:x.ok?1:0,g:givenPlain(x.q,x.g).slice(0,80),r:String(rightPlain(x.q)).slice(0,80),id:x.q.id||''}))});ST.arch=ST.arch.slice(0,40);}
   const scs=new Set(R.filter(r=>r.sc).map(r=>r.sc));scs.forEach(id=>{const sc=SCENES.find(s=>s.id===id);const k=R.filter(r=>r.sc===id&&r.ok).length;const o=ST.sc[id]||{best:0,n:0};o.best=Math.max(o.best,k);o.last=k;o.n++;ST.sc[id]=o;});
@@ -937,6 +952,7 @@ function resultView(){
   return `<div class="res"><div class="kick">${H(r.title)}</div><div class="bigp">${p} %</div><h1 class="lt">${msg}</h1><p class="lead">${r.ok} von ${r.n} richtig · Dauer ${mmss(r.dur/1000)}${r.mode==='exam'&&r.R.length<r.n?' · Zeit abgelaufen':''}</p></div>
    ${Object.keys(byA).length>1?`<div class="card">${Object.entries(byA).map(([a,v])=>`<div class="srow"><span>${H(SHORT[a]||'Wissen')}</span><b>${v.ok}/${v.n}</b></div>`).join('')}</div>`:''}
    ${scImgs.map(sc=>`<details class="card"><summary><b>Bild nochmal ansehen: ${H(sc.t)}</b></summary><button class="scimg" data-a="rimg" data-x="${H(sc.img)}" data-t="${H(sc.t)}" aria-label="Bild vergrößern"><img src="${sc.img}" alt=""><span class="zb">${ICO(I.zoom,18)}</span></button></details>`).join('')}
+   ${r.mode==='blitz'?`<div class="card"><b>${r.ok>r.best?'Neuer Bestwert!':'Dein Bestwert: '+r.best+' richtige'}</b><p class="sub">${r.ok} richtige in 3 Minuten. Tempo zählt am Testtag, Genauigkeit aber mehr.</p><button class="btn sm" data-a="blitz">Nochmal</button></div>`:''}
    ${r.mode==='einst'?`<div class="card"><b>Deine Einstufung ist gespeichert.</b><p class="sub">Der Tagesplan auf „Heute“ richtet sich ab jetzt nach deinen schwächsten Bereichen.</p></div>`:''}
    <div class="sec">Alle Antworten</div><div class="card">${r.R.map(x=>`<details class="rv ${x.ok?'ok':'bad'}"><summary><span class="rd">${x.ok?'✓':'✕'}</span><span class="rq">${H(String(x.q.q).split('\n')[0].slice(0,110))}</span></summary>
      <div class="rvb">${x.q.fig?`<div class="fig">${x.q.fig}</div>`:''}<p class="pre">${H(x.q.q)}</p><p><small>Deine Antwort:</small> ${x.q.t==='mc'?(x.q.oh?x.q.o[x.g]:H(x.q.o[x.g])):H(x.g)}</p><p><small>Richtig:</small> ${rightAns(x.q)}</p>${x.q.e?`<p class="sub">${H(x.q.e)}</p>`:''}</div></details>`).join('')||'<p class="sub">Keine Antworten.</p>'}</div>
@@ -1113,6 +1129,7 @@ document.addEventListener('click',ev=>{
    case 'ob-done':ST.onb=true;save();V={tab:'home',view:'home',arg:null,seg:'t1'};render();break;
    case 'einst':{const it=[];it.push(...mix(genPick('zr',1).concat(bankPick('lg',1))).map(q=>Q(q,'logik')));it.push(...genPick('rv',2).map(q=>Q(q,'raum')));it.push(...genPick('ko',2).map(q=>Q(q,'konz')));it.push(...memoBlock(1));it.push(...passBlock(PASS[0],3));it.push(...bankPick('rs',1).concat(bankPick('gr',1)).map(q=>Q(q,'sprache')));start('Einstufung',it,'einst');break;}
    case 'unit':{const P=plan(),u=P.u[+b.dataset.i];if(!u)break;start(u.t,unitItems(u),'plan',{unit:+b.dataset.i});break;}
+   case 'blitz':closeSheet();start('Blitzrunde',blitzItems(),'blitz');break;
    case 'due':start('Wiederholen',mix(dueIds()).map(id=>Q(QBYID[id])),'wieder');break;
    case 'wrong':{const it=mix(wrongIds()).map(id=>Q(QBYID[id])).concat(ST.wg.map(q=>Object.assign(Q(q),{wgi:1,wgref:q})));start('Fehler-Training',it,'fehler');break;}
    case 'exam':sheet(`<h2>Simulation starten?</h2><p class="sub">45 Minuten, alle 6 Testbereiche, Antworten erst am Ende. Wie am Testtag: nicht hängen bleiben, weitermachen.</p><div class="stackb"><button class="btn dark" data-a="exam-go">Los geht's</button><button class="btn ghost" data-a="sclose">Abbrechen</button></div>`);break;
@@ -1191,5 +1208,5 @@ if('speechSynthesis' in window)try{speechSynthesis.onvoiceschanged=()=>{};speech
 const LOGO='<svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true"><rect width="64" height="64" rx="18" fill="#0A3D8F"/><path d="M32 13l15 5.6v11.2c0 9.4-6.4 17.4-15 20.6-8.6-3.2-15-11.2-15-20.6V18.6z" fill="none" stroke="#fff" stroke-width="3"/><path d="M25 32l5 5 9-10" fill="none" stroke="#FFCC00" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 sbInit();render();capInit();
-try{if('serviceWorker' in navigator&&location.protocol==='https:'&&!/claude/.test(location.hostname)&&window.top===window)navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){}
+try{if('serviceWorker' in navigator&&location.protocol==='https:'&&!/claude/.test(location.hostname)&&window.top===window){const had=!!navigator.serviceWorker.controller;navigator.serviceWorker.register('sw.js').then(r=>{document.addEventListener('visibilitychange',()=>{if(!document.hidden)r.update().catch(()=>{});});}).catch(()=>{});navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!had||document.getElementById('upd'))return;const b=document.createElement('button');b.id='upd';b.className='updb';b.innerHTML='<b>Neue Version verfügbar</b><span>Tippen zum Aktualisieren</span>';b.onclick=()=>location.reload();document.body.appendChild(b);});}}catch(e){}
 })();
