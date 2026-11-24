@@ -42,7 +42,7 @@ const I={
 /* ================= Zustand ================= */
 function fresh(){return {v:1,upd:0,name:'',test:'',onb:false,acct:'local',theme:'weiss',
  tts:{eng:'hb',cv:'buttery',sex:'w',rate:1,hl:true},ki:true,round:'alle',
- sp:{},mk:{},rk:{},arch:[],conf:true,gkey:'',rem:'18:00',qs:{},notes:{},wg:[],log:[],days:{},lv:{},sc:{},plan:null,iv:{},chk:{},lex:{},ex:[],blitz:[],einst:null,psg:{},dk:{n:0,ok:0}};}
+ sp:{},mk:{},rk:{},arch:[],conf:true,gkey:'',rem:'18:00',qs:{},notes:{},wg:[],log:[],days:{},lv:{},sc:{},plan:null,iv:{},chk:{},lex:{},ex:[],blitz:[],goal:20,fs:'1',xm:{logik:1,raum:1,konz:1,merk:1,text:1,sprache:1},einst:null,psg:{},dk:{n:0,ok:0}};}
 let ST=(()=>{try{const s=JSON.parse(localStorage.getItem(SKEY)||'null');if(s&&s.v===1)return Object.assign(fresh(),s);}catch(e){}return fresh();})();
 let storeOK=true;
 function save(){ST.upd=Date.now();try{localStorage.setItem(SKEY,JSON.stringify(ST));storeOK=true;}catch(e){storeOK=false;}cloudQueue();}
@@ -232,7 +232,7 @@ function authView(){
 }
 
 /* ================= Entwickler-Bereich (nur Konten mit Rolle "dev") ================= */
-const APPV='2026.11.24.2';
+const APPV='2026.11.24.3';
 const isDev=()=>!!(A.user&&A.user.app_metadata&&A.user.app_metadata.role==='dev');
 let DEVS=null;
 function devView(){
@@ -346,7 +346,7 @@ function tab(t){ruStop();K=null;stack.length=0;V.tab=t;V.view=t;V.arg=null;stopS
 
 /* ================= Rendering ================= */
 const TH_BG={weiss:'#F5F5F7',hell:'#E9E9EE',dunkel:'#1C1C1E',schwarz:'#000000'};
-function applyTheme(){const t=ST.theme||'weiss';if(document.documentElement.getAttribute('data-th')===t)return;document.documentElement.setAttribute('data-th',t);AREA_COL=(t==='dunkel'||t==='schwarz')?AREA_COL_D:AREA_COL_L;const m=document.querySelector('meta[name=theme-color]');if(m)m.setAttribute('content',TH_BG[t]||'#F5F5F7');}
+function applyTheme(){document.documentElement.style.setProperty('--z',ST.fs||'1');document.documentElement.classList.toggle('fsbig',(ST.fs||'1')!=='1');const t=ST.theme||'weiss';if(document.documentElement.getAttribute('data-th')===t)return;document.documentElement.setAttribute('data-th',t);AREA_COL=(t==='dunkel'||t==='schwarz')?AREA_COL_D:AREA_COL_L;const m=document.querySelector('meta[name=theme-color]');if(m)m.setAttribute('content',TH_BG[t]||'#F5F5F7');}
 function nav(){
   const t=[['home','Heute',I.home],['learn','Lernen',I.learn],['know','Wissen',I.know],['me','Profil',I.me]];
   return `<nav class="tabbar" aria-label="Hauptmenü">${t.map(([id,l,ic])=>`<button data-a="tab" data-v="${id}" class="${V.tab===id?'on':''}" ${V.tab===id?'aria-current="page"':''}>${ICO(ic)}<span>${l}</span></button>`).join('')}</nav>`;
@@ -417,7 +417,7 @@ function homeView(){
   const kp=`<div class="kpis">
     <button class="kpi" data-a="go" data-v="me">${dl==null?'<b>–</b><span>Testtermin eintragen</span>':`<b>${dl<0?'vorbei':dl}</b><span>${dl===1?'Tag':'Tage'} bis Testtag 1</span>`}</button>
     <div class="kpi"><b>${rd==null?'–':rd+' %'}</b><span>Bereitschaft</span></div>
-    <div class="kpi"><b>${sk}</b><span>${sk===1?'Tag':'Tage'} in Folge</span></div></div>`;
+    <div class="kpi"><b>${sk}</b><span>${sk===1?'Tag':'Tage'} in Folge</span></div></div>${(()=>{const g=Math.max(1,ST.goal||20),n=ST.days[dk()]||0,p=Math.min(100,Math.round(100*n/g));return `<div class="card goal"><div class="ch"><b>${n>=g?'Tagesziel erreicht':'Tagesziel'}</b><span class="sub">${n} von ${g} Antworten</span></div><div class="track"><i style="width:${p}%;${n>=g?'background:var(--ok)':''}"></i></div></div>`;})()}`;
   const bars=`<div class="card"><div class="ch"><b>Testbereiche</b><button class="lnk" data-a="tab" data-v="learn">Alle</button></div>
     ${AREAS.map(a=>{const s=areaScore(a.id);return `<button class="abar" data-a="go" data-v="area" data-x="${a.id}"><span>${SHORT[a.id]}</span><span class="track"><i style="width:${s||0}%;background:${s==null?'var(--track)':s>=70?'var(--ok)':s>=50?'var(--tint)':'var(--amber)'}"></i></span><b>${s==null?'–':s}</b></button>`;}).join('')}
     <p class="fine left">Bereitschaft = Trefferquote der letzten 40 Antworten je Bereich, gewichtet nach Übungsmenge. Ab 2 Antworten, wird mit mehr Übung genauer.</p></div>`;
@@ -605,6 +605,8 @@ function meView(){
    <div class="sec">Einstellungen</div>
    <div class="card">
     <div class="frow"><div><b>Helligkeit</b><small>Standard: Weiß</small></div><div class="seg sm">${[['weiss','Weiß'],['hell','Hell'],['dunkel','Dunkel'],['schwarz','Schwarz']].map(([v,l])=>`<button class="${ST.theme===v?'on':''}" data-a="set" data-k="theme" data-v="${v}">${l}</button>`).join('')}</div></div>
+    <div class="frow"><div><b>Schriftgröße</b><small>Für Fragen und Texte</small></div><div class="seg sm">${[['1','Normal'],['1.15','Groß'],['1.3','Sehr groß']].map(([v,l])=>`<button class="${(ST.fs||'1')===v?'on':''}" data-a="set" data-k="fs" data-v="${v}">${l}</button>`).join('')}</div></div>
+    <div class="frow"><div><b>Tagesziel</b><small>Antworten pro Tag</small></div><div class="seg sm">${[10,20,30,50].map(n=>`<button class="${ST.goal===n?'on':''}" data-a="set" data-k="goal" data-v="${n}">${n}</button>`).join('')}</div></div>
     ${voices}${cv}
     <div class="frow"><div><b>Vorlese-Tempo</b><small id="rtv">${String(ST.tts.rate).replace('.',',')}×${eng==='auto'?' (Claude-Stimme: 0,7–1,5×)':''}</small></div><input type="range" min="0.5" max="2" step="0.1" value="${ST.tts.rate}" class="range" data-a="rate" aria-label="Vorlese-Tempo"></div>
     <div class="frow"><div><b>Mitlesen markieren</b><small>Aktueller Satz wird hervorgehoben</small></div>${sw('tts.hl',ST.tts.hl)}</div>
@@ -660,7 +662,8 @@ function statsView(){
 function dataView(){
   return head('Sichern und übertragen','Kopiere den Code und füge ihn auf dem anderen Gerät hier wieder ein. Funktioniert auch ohne Konto.','Profil')+`
    <div class="card"><div class="ch"><b>1. Code von diesem Gerät</b></div><textarea class="in ta mono" id="excode" rows="4" readonly>${H(btoa(unescape(encodeURIComponent(JSON.stringify(ST)))))}</textarea><button class="btn sm" data-a="copy">Code kopieren</button></div>
-   <div class="card"><div class="ch"><b>2. Code einfügen</b></div><textarea class="in ta mono" id="imcode" rows="4" placeholder="Code hier einfügen …"></textarea><button class="btn sm alt" data-a="import">Übernehmen</button><p class="fine left">Ersetzt den Stand auf diesem Gerät.</p></div>`;
+   <div class="card"><div class="ch"><b>2. Code einfügen</b></div><textarea class="in ta mono" id="imcode" rows="4" placeholder="Code hier einfügen …"></textarea><button class="btn sm alt" data-a="import">Übernehmen</button><p class="fine left">Ersetzt den Stand auf diesem Gerät.</p></div>
+   <div class="card"><div class="ch"><b>3. Als Datei sichern</b></div><p class="sub">Eine Sicherungsdatei für Dateien-App, iCloud oder E-Mail.</p><div class="stackb"><button class="btn sm" data-a="bkfile">Sicherung speichern</button><label class="btn sm alt filebtn">Sicherung laden<input type="file" id="bkin" accept=".json,application/json" hidden></label></div></div>`;
 }
 
 
@@ -701,7 +704,7 @@ function weakItems(x){
 }
 function archView(){
   if(V.arg!=null&&ST.arch[V.arg]){const r=ST.arch[V.arg];return head(r.title,`${new Date(r.t).toLocaleString('de-AT',{dateStyle:'medium',timeStyle:'short'})} · ${r.ok}/${r.n} richtig · ${mmss(r.dur/1000)}`,'Archiv')+`<div class="card">${r.R.map(x=>`<div class="arw ${x.ok?'ok':'bad'}"><span class="rd">${x.ok?'✓':'✕'}</span><div><p class="pre">${H(x.q)}</p><small>Deine Antwort: ${H(x.g)}${x.ok?'':' · Richtig: '+H(x.r)}</small></div></div>`).join('')}</div>`;}
-  return head('Ergebnis-Archiv',`${ST.arch.length} gespeicherte Runden (die letzten 40).`,'Profil')+(ST.arch.length?`<div class="list">${ST.arch.map((r,i)=>`<button class="li" data-a="go" data-v="archiv" data-x="${i}"><span class="tx"><b>${H(r.title)}</b><span class="s">${new Date(r.t).toLocaleString('de-AT',{dateStyle:'short',timeStyle:'short'})} · ${r.n} Aufgaben</span></span><span class="val">${Math.round(100*r.ok/r.n)} %</span>${ICO(I.chev,18)}</button>`).join('')}</div>`:'<p class="sub pad">Noch keine Runde abgeschlossen.</p>');
+  return head('Ergebnis-Archiv',`${ST.arch.length} gespeicherte Runden (die letzten 40).`,'Profil')+(ST.arch.length?`<button class="pill" data-a="arcsv">Als Tabelle (CSV) exportieren</button>`:'')+(ST.arch.length?`<div class="list">${ST.arch.map((r,i)=>`<button class="li" data-a="go" data-v="archiv" data-x="${i}"><span class="tx"><b>${H(r.title)}</b><span class="s">${new Date(r.t).toLocaleString('de-AT',{dateStyle:'short',timeStyle:'short'})} · ${r.n} Aufgaben</span></span><span class="val">${Math.round(100*r.ok/r.n)} %</span>${ICO(I.chev,18)}</button>`).join('')}</div>`:'<p class="sub pad">Noch keine Runde abgeschlossen.</p>');
 }
 let NF='';
 function notesView(){
@@ -803,7 +806,7 @@ document.addEventListener('keydown',e=>{if(!ZV.el)return;if(e.key==='Escape'){zv
 function start(title,items,mode,meta){
   items=items.filter(Boolean);if(!items.length){toast('Gerade keine Aufgaben verfügbar.');return;}
   stopSpeak();
-  S={qt:Date.now(),sel:null,title,items,i:0,mode:mode||'learn',meta:meta||{},res:[],ans:false,given:null,t0:Date.now(),end:mode==='exam'?Date.now()+EXAM_MIN*60000:mode==='blitz'?Date.now()+BLITZ_SEC*1000:0,zoom:false};
+  S={qt:Date.now(),sel:null,title,items,i:0,mode:mode||'learn',meta:meta||{},res:[],ans:false,given:null,t0:Date.now(),end:mode==='exam'?Date.now()+((meta&&meta.min)||EXAM_MIN)*60000:mode==='blitz'?Date.now()+BLITZ_SEC*1000:0,zoom:false};
   const it=S.items[0];if(it.k==='scene'||it.k==='memo')S.stud=Date.now()+(it.k==='scene'?it.sc.secs:it.m.secs)*1000;
   render();window.scrollTo(0,0);startTick();
 }
@@ -815,7 +818,10 @@ function startTick(){clearInterval(tick);tick=setInterval(()=>{
   if(it&&(it.k==='scene'||it.k==='memo')&&S.stud){const r=Math.max(0,S.stud-Date.now());const el=document.getElementById('stud');if(el){el.textContent=mmss(Math.ceil(r/1000));const b=document.getElementById('studbar');if(b)b.style.width=(100*r/((it.k==='scene'?it.sc.secs:it.m.secs)*1000))+'%';}if(r<=0){S.stud=0;nextItem();}}
 },250);}
 const mmss=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
-const BLITZ_SEC=180;
+const BLITZ_SEC=180,AREA_MIN={logik:14,raum:7,konz:5,merk:3,text:10,sprache:8};
+const examSel=()=>AREAS.map(a=>a.id).filter(id=>ST.xm[id]);
+function examMin(sel){if(sel.length===6)return EXAM_MIN;const t=sel.reduce((s,id)=>s+(AREA_MIN[id]||5),0);return Math.max(3,Math.round(EXAM_MIN*t/47));}
+function examSheet(){const sel=examSel();return `<h2>Simulation starten?</h2><p class="sub">Antworten erst am Ende. Wie am Testtag: nicht hängen bleiben, weitermachen.</p><div class="fine left">Bereiche</div><div class="chips xmc">${AREAS.map(a=>`<button class="chip ${ST.xm[a.id]?'on':''}" data-a="xm" data-x="${a.id}" aria-pressed="${ST.xm[a.id]?'true':'false'}">${H(SHORT[a.id])}</button>`).join('')}</div><p class="sub">${sel.length?sel.length===6?'Alle 6 Bereiche · 45 Minuten':sel.length+(sel.length===1?' Bereich':' Bereiche')+' · '+examMin(sel)+' Minuten':'Kein Bereich gewählt'}</p><div class="stackb"><button class="btn dark" data-a="exam-go" ${sel.length?'':'disabled'}>Los geht's</button><button class="btn ghost" data-a="sclose">Abbrechen</button></div>`;}
 function blitzItems(){const c=['zr','ma','ab','zr','ma','ko'];const out=[];for(let i=0;i<24;i++){const k=i%6===5?'rv':c[i%c.length];out.push(...genPick(k,1));}return out.map(q=>Q(q));}
 function flash(ok){let el=document.getElementById('flash');if(!el){el=document.createElement('div');el.id='flash';el.setAttribute('aria-hidden','true');document.body.appendChild(el);}el.className=ok?'ok':'bad';el.textContent=ok?'✓':'✕';void el.offsetWidth;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),450);}
 function qCount(){return S.items.filter(x=>x.k==='q').length;}
@@ -1068,6 +1074,7 @@ function extPrompt(q){return `Ich übe für den Aufnahmetest der Polizei Österr
 /* ================= Kleine Helfer ================= */
 function toast(t){let el=document.getElementById('toast');if(!el){el=document.createElement('div');el.id='toast';el.setAttribute('role','status');document.body.appendChild(el);}el.textContent=t;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),2600);}
 function sheet(html){closeSheet();const d=document.createElement('div');d.className='xov';d.innerHTML=`<div class="xbg" data-a="sclose"></div><div class="xsheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`;document.body.appendChild(d);const f=d.querySelector('button,a');if(f)f.focus();}
+async function saveFile(name,text,type){const blob=new Blob([text],{type});try{const f=new File([blob],name,{type});if(navigator.canShare&&navigator.canShare({files:[f]})&&/iPhone|iPad|Android/.test(navigator.userAgent)){await navigator.share({files:[f],title:name});return;}}catch(e){if(e&&e.name==='AbortError')return;}const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);toast('Datei gespeichert');}
 function closeSheet(){document.querySelectorAll('.xov').forEach(e=>e.remove());}
 function setPath(k,v){const p=k.split('.');let o=ST;while(p.length>1)o=o[p.shift()];o[p[0]]=v;}
 function getPath(k){return k.split('.').reduce((o,x)=>o&&o[x],ST);}
@@ -1132,8 +1139,9 @@ document.addEventListener('click',ev=>{
    case 'blitz':closeSheet();start('Blitzrunde',blitzItems(),'blitz');break;
    case 'due':start('Wiederholen',mix(dueIds()).map(id=>Q(QBYID[id])),'wieder');break;
    case 'wrong':{const it=mix(wrongIds()).map(id=>Q(QBYID[id])).concat(ST.wg.map(q=>Object.assign(Q(q),{wgi:1,wgref:q})));start('Fehler-Training',it,'fehler');break;}
-   case 'exam':sheet(`<h2>Simulation starten?</h2><p class="sub">45 Minuten, alle 6 Testbereiche, Antworten erst am Ende. Wie am Testtag: nicht hängen bleiben, weitermachen.</p><div class="stackb"><button class="btn dark" data-a="exam-go">Los geht's</button><button class="btn ghost" data-a="sclose">Abbrechen</button></div>`);break;
-   case 'exam-go':{closeSheet();const it=[];EXAM_PLAN.forEach(([area,parts])=>parts.forEach(([cat,n])=>{if(n==='blk')it.push(...memoBlock(2));else if(n==='blk2'){it.push(...passBlock(nextPassage()));it.push(...passBlock(nextPassage()));}else if(GEN[cat]&&CAT[cat].gen)it.push(...genPick(cat,n).map(q=>Q(q,area)));else it.push(...bankPick(cat,n).map(q=>Q(q,area)));}));start('Simulation',it,'exam');break;}
+   case 'exam':sheet(examSheet());break;
+   case 'xm':{ST.xm[x]=ST.xm[x]?0:1;save();const sh=document.querySelector('.xsheet');if(sh)sh.innerHTML='<div class="grab"></div>'+examSheet();break;}
+   case 'exam-go':{closeSheet();const sel=examSel();if(!sel.length){toast('Mindestens einen Bereich wählen.');break;}const it=[];EXAM_PLAN.filter(([area])=>sel.includes(area)).forEach(([area,parts])=>parts.forEach(([cat,n])=>{if(n==='blk')it.push(...memoBlock(2));else if(n==='blk2'){it.push(...passBlock(nextPassage()));it.push(...passBlock(nextPassage()));}else if(GEN[cat]&&CAT[cat].gen)it.push(...genPick(cat,n).map(q=>Q(q,area)));else it.push(...bankPick(cat,n).map(q=>Q(q,area)));}));start(sel.length===6?'Simulation':'Simulation: '+sel.length+(sel.length===1?' Bereich':' Bereiche'),it,'exam',{min:examMin(sel)});break;}
    case 'arun':start(AREA[x].t,areaItems(x),'learn');break;
    case 'cat':start(CAT[x].t,catItems(x),'learn');break;
    case 'scene':{const sc=SCENES.find(s=>s.id===x);start(sc.t,sceneBlock(sc),'scene');break;}
@@ -1167,11 +1175,13 @@ document.addEventListener('click',ev=>{
    case 'dkcheck':{const t=document.getElementById('dkin');const g=t?t.value:'';if(!g.trim()){toast('Schreib zuerst den Satz.');break;}DK.res=dkCompare(g,DIKTAT[DK.i%DIKTAT.length][0]);ST.dk.n++;if(DK.res.ok)ST.dk.ok++;ST.log.push({t:Date.now(),a:'sprache',c:'dk',o:DK.res.ok?1:0});ST.days[dk()]=(ST.days[dk()]||0)+1;save();render();break;}
    case 'dknext':DK.i++;DK.res=null;render();break;
    case 'chk':ST.chk[x]=!ST.chk[x];save();render();break;
-   case 'set':setPath(b.dataset.k,v);save();if(b.dataset.k==='theme')applyTheme();render();break;
+   case 'set':setPath(b.dataset.k,b.dataset.k==='goal'?+v:v);save();if(b.dataset.k==='theme')applyTheme();render();break;
    case 'tog':setPath(b.dataset.k,!getPath(b.dataset.k));save();render();break;
    case 'acct-on':ST.acct='cloud';save();cloudPull();render();break;
    case 'acct-off':ST.acct='local';save();render();toast('Ab jetzt nur noch auf diesem Gerät.');break;
    case 'sync':cloudPull();break;
+   case 'bkfile':saveFile('aufnahmetest-sicherung-'+dk()+'.json',JSON.stringify(ST),'application/json');break;
+   case 'arcsv':{const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';const rows=[['Datum','Runde','Modus','Richtig','Fragen','Dauer'].join(';')];ST.arch.forEach(r=>rows.push([new Date(r.t).toLocaleString('de-AT'),r.title,r.mode,r.ok,r.n,mmss(r.dur/1000)].map(q).join(';')));saveFile('aufnahmetest-archiv-'+dk()+'.csv','\ufeff'+rows.join('\n'),'text/csv');break;}
    case 'copy':{const t=document.getElementById('excode');t.select();try{navigator.clipboard.writeText(t.value).then(()=>toast('Code kopiert'),()=>{document.execCommand('copy');toast('Code kopiert');});}catch(e){document.execCommand('copy');toast('Code kopiert');}break;}
    case 'import':{const t=document.getElementById('imcode');try{const s=JSON.parse(decodeURIComponent(escape(atob(t.value.trim()))));if(!s||s.v!==1)throw 0;sheet(`<h2>Stand übernehmen?</h2><p class="sub">Der aktuelle Stand auf diesem Gerät wird ersetzt.</p><div class="stackb"><button class="btn dark" data-a="import-go">Übernehmen</button><button class="btn ghost" data-a="sclose">Abbrechen</button></div>`);window.__imp=s;}catch(e){toast('Code ungültig.');}break;}
    case 'import-go':{closeSheet();const keep=ST.acct;ST=Object.assign(fresh(),window.__imp);ST.acct=keep;ST.onb=true;save();toast('Übernommen');tab('me');break;}
@@ -1190,6 +1200,7 @@ document.addEventListener('input',ev=>{
 });
 document.addEventListener('change',ev=>{
   const t=ev.target;
+  if(t.id==='bkin'&&t.files&&t.files[0]){const r=new FileReader();r.onload=()=>{try{const s=JSON.parse(r.result);if(!s||s.v!==1)throw 0;window.__imp=s;sheet(`<h2>Sicherung laden?</h2><p class="sub">Der aktuelle Stand auf diesem Gerät wird ersetzt.</p><div class="stackb"><button class="btn dark" data-a="import-go">Übernehmen</button><button class="btn ghost" data-a="sclose">Abbrechen</button></div>`);}catch(e){toast('Datei ist keine gültige Sicherung.');}};r.readAsText(t.files[0]);t.value='';}
   if(t.id==='gkey'){ST.gkey=t.value.trim();save();toast(ST.gkey?'Gemini-Schlüssel gespeichert':'Schlüssel entfernt');render();}
   if(t.id==='remt'){ST.rem=t.value||'18:00';save();}
   if(t.id==='sppu'||t.id==='sprun'){ST.sp=ST.sp||{};ST.sp[t.id==='sppu'?'pu':'run']=t.value.trim();save();render();}
