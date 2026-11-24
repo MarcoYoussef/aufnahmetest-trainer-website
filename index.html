@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-3Hce2F1UvbrCqZypAHnU3Qk/8+AqjqjfgleXueYqnLM=' 'sha256-3xswfkFtckRRfkr+btNAFTdyh8wqxjtgZHr89Ey8XrI=' 'sha256-Y+n/hLNluV31i134qe0EeiNeG3ALVRcxdskKNKS+VwY=' 'sha256-Khk4Fep6QneqngYAlLIG3H888lQAbb171RDrdY81/tc=' 'sha256-j3+d1brFevnL5T/83EwD+sn9DZXjhzwcgJKITTrgWEk='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://generativelanguage.googleapis.com https://api.anthropic.com https://api.openai.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-3Hce2F1UvbrCqZypAHnU3Qk/8+AqjqjfgleXueYqnLM=' 'sha256-MhdjKPQLJLP6RuogA7lHQelU+Ql+a7ShVSvmrZ8UwV8=' 'sha256-Y23RpInzJbhUKiWK7SMXI483FVtPC+rAeAB8R8GmaMY=' 'sha256-Khk4Fep6QneqngYAlLIG3H888lQAbb171RDrdY81/tc=' 'sha256-4+0yosnzre3mrMLA9ET3clWldKrniPOyCdM+Q9PrlXg='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://generativelanguage.googleapis.com https://api.anthropic.com https://api.openai.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="thc" content="#000000">
@@ -5180,13 +5180,14 @@ function elSwitches(app){
   if(S&&!S.done){const q=app.querySelector('.card>.q');if(q&&q.textContent.length>140)q.classList.add('long');}
 };}
 
+
 load();if(ST.set&&ST.set.tips==null)ST.set.tips=1;applyTheme();elApply();checkBadges();render();try{restoreFromMirror();}catch(e){}
 
 </script>
 <div id="upd" class="upd" role="status" hidden><span>Neue Version verfügbar</span><button class="btn sm" id="updbtn">Aktualisieren</button></div>
 <style>.upd{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);color:var(--ink);border-radius:14px;padding:10px 12px 10px 16px;box-shadow:0 6px 24px rgba(0,0,0,.18);font-weight:600;max-width:600px;margin:0 auto}.upd[hidden]{display:none}</style>
 <script>
-/* Website-Fassung: offline per Service Worker, Hinweis bei neuer Version (Version f3f8513c01d2) */
+/* Website-Fassung: offline per Service Worker, Hinweis bei neuer Version (Version 9077870a1f4c) */
 (function(){
   if(!('serviceWorker' in navigator))return;
   if(!(location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'))return;
@@ -5912,6 +5913,36 @@ document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act="all
  document.addEventListener('click',ev=>{if(K&&ev.target.closest('[data-act="doreset"]')){Object.assign(ST,K);K=null;rsClear();save();applyTheme();render();}});}
 hsMigrate();applyTheme();try{elApply();}catch(e){}render();
 })();
+
+/* ===================== Nach Testtag 1: Ergebnis eintragen und nächster Schritt ===================== */
+function tt1Plus6(){if(!ST.tdate)return '';const d=new Date(ST.tdate+'T00:00');d.setMonth(d.getMonth()+6);return d.toLocaleDateString('de-AT',{day:'numeric',month:'long',year:'numeric'});}
+function tt1Hero(app){
+  const hero=app.querySelector(':scope>.hero');if(!hero||hero.dataset.tt1)return;
+  const hk=hero.querySelector('.hk');if(!hk||hk.textContent.trim()!=='Testtag vorbei')return;
+  hero.dataset.tt1='1';const r=ST.tt1||'',h2=hero.querySelector('h2'),sub=hero.querySelector('.hs2'),act=hero.querySelector('.hact');
+  const B=(lbl,attr,cls)=>`<button type="button" class="${cls||'btn'}" ${attr}>${lbl}</button>`;
+  const chg=`<button type="button" class="hlink" data-act="tt1set" data-v="">Ergebnis ändern</button>`;
+  if(!r){hk.textContent='Testtag 1 vorbei';h2.textContent='Wie ist es gelaufen?';sub.textContent='Sag es der App, dann zeigt sie dir den nächsten Schritt.';
+    act.innerHTML=`<div class="tt1c" role="group" aria-label="Ergebnis Testtag 1">${B('Bestanden','data-act="tt1set" data-v="ok"','btn')}${B('Nicht bestanden','data-act="tt1set" data-v="no"','btn tt1alt')}${B('Weiß ich noch nicht','data-act="tt1set" data-v="open"','btn tt1alt')}</div><button type="button" class="hlink" data-go="settings">Neuen Testtermin eintragen</button>`;}
+  else if(r==='ok'){hk.textContent='Testtag 1 bestanden';h2.textContent='Jetzt kommt Testtag 2.';sub.textContent='Ärztliche Untersuchung mit Fahrradergometrie und Aufnahmegespräch. Befunde dürfen höchstens 3 Monate alt sein.';
+    act.innerHTML=B('Aufnahmegespräch üben','data-go="interview"')+`<button type="button" class="hlink" data-go="ablauf">Ablauf und Checkliste</button><button type="button" class="hlink" data-go="sport">Fitness für die Ergometrie</button>`+chg;}
+  else if(r==='open'){hk.textContent='Ergebnis kommt schriftlich';h2.textContent='Bis dahin: Testtag 2 vorbereiten.';sub.textContent='Gespräch üben und Unterlagen planen. So verlierst du keine Zeit, wenn du bestanden hast.';
+    act.innerHTML=B('Aufnahmegespräch üben','data-go="interview"')+`<button type="button" class="hlink" data-go="ablauf">Ablauf und Checkliste</button>`+chg;}
+  else if(r==='no'){const d=tt1Plus6();hk.textContent='Testtag 1';h2.textContent='Nicht aufgeben. Du kannst wiederholen.';sub.textContent='Nicht bestandene Teile kannst du einmal nach sechs Monaten wiederholen'+(d?', also ab etwa '+d:'')+'. Übe gezielt deine schwächsten Bereiche.';
+    act.innerHTML=B('Schwächen gezielt üben','data-go="analyse"')+`<button type="button" class="hlink" data-act="smart">Weiter lernen</button><button type="button" class="hlink" data-go="settings">Neuen Testtermin eintragen</button>`+chg;}
+  if(r==='ok'){const pc=app.querySelector('#progcard');if(pc)pc.remove();}
+  const st=app.querySelector('.hstats .hstat b');if(st&&r){st.textContent=r==='ok'?'✓':r==='no'?'6 Mon.':'…';const sp=st.nextElementSibling;if(sp)sp.textContent=r==='ok'?'Testtag 1 bestanden':r==='no'?'bis zur Wiederholung':'Ergebnis offen';}
+}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-act="tt1set"]');if(!b)return;ST.tt1=b.dataset.v||'';save();render();window.scrollTo(0,0);});
+{const _r3=render;render=function(){_r3.apply(this,arguments);if(!S&&view==='home'){try{tt1Hero(document.getElementById('app'));}catch(e){}}};}
+
 </script>
+<style id="nachtest">
+.tt1c{display:flex;flex-wrap:wrap;gap:8px;width:100%}
+.hero .hact .tt1c .btn{flex:1 1 120px;min-height:46px;font-size:16px;padding:10px 14px}
+.hero .hact .tt1c .btn.tt1alt{background:rgba(255,255,255,.16);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+.hero .hact{flex-wrap:wrap}
+</style>
+
 </body>
 </html>
