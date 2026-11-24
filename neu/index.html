@@ -268,9 +268,10 @@ form.card .lnk{display:block;margin:6px auto 0}
 .zvz{font-size:13px;font-weight:700;min-width:48px;text-align:center;font-variant-numeric:tabular-nums;opacity:.85}
 .zvbtn{width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;font-size:24px;font-weight:600;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .zvbtn.x{background:#fff;color:#000}
-.zvb{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-x pan-y;display:grid;place-items:center}
-.zvb.zoomed{display:block}
-.zvi{margin:auto}.zvb.zoomed .zvi{margin:0 auto}.zvi img,.zvi svg{display:block;width:100%;height:auto;max-width:none;user-select:none;-webkit-user-select:none}
+.zvb{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-x pan-y;display:block;position:relative}
+.zvi{display:block}.zvi img,.zvi svg{width:100%!important;height:100%!important}
+.zvfill{border:0;border-radius:22px;height:44px;padding:0 14px;background:rgba(255,255,255,.16);color:#fff;font:600 14px var(--font);cursor:pointer;white-space:nowrap}.zvfill[hidden]{display:none}
+@media (max-width:430px){.zvt{display:none}.zvh{justify-content:flex-end}}.zvi img,.zvi svg{display:block;width:100%;height:auto;max-width:none;user-select:none;-webkit-user-select:none}
 .zvi svg{background:#fff;border-radius:8px}
 .zvf{font-size:12px;text-align:center;padding:8px 12px calc(10px + env(safe-area-inset-bottom));opacity:.7}
 body.zvopen{overflow:hidden}

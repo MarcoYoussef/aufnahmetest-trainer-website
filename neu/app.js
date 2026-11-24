@@ -756,10 +756,10 @@ const ZV={z:1,el:null};
 function zvOpen(html,title){
   zvClose();ZV.z=1;
   const d=document.createElement('div');d.className='zv';d.setAttribute('role','dialog');d.setAttribute('aria-modal','true');d.setAttribute('aria-label',title||'Bild');
-  d.innerHTML=`<div class="zvh"><span class="zvt">${H(title||'')}</span><button class="zvbtn" data-zv="out" aria-label="Verkleinern">−</button><span class="zvz" aria-live="polite">100 %</span><button class="zvbtn" data-zv="in" aria-label="Vergrößern">+</button><button class="zvbtn x" data-zv="close" aria-label="Schließen">${ICO(I.x,20)}</button></div><div class="zvb"><div class="zvi">${html}</div></div><div class="zvf">Doppeltippen oder mit zwei Fingern zoomen · ziehen zum Verschieben</div>`;
+  d.innerHTML=`<div class="zvh"><span class="zvt">${H(title||'')}</span><button class="zvfill" data-zv="fill" hidden>Bildschirm füllen</button><button class="zvbtn" data-zv="out" aria-label="Verkleinern">−</button><span class="zvz" aria-live="polite">100 %</span><button class="zvbtn" data-zv="in" aria-label="Vergrößern">+</button><button class="zvbtn x" data-zv="close" aria-label="Schließen">${ICO(I.x,20)}</button></div><div class="zvb"><div class="zvi">${html}</div></div><div class="zvf">Doppeltippen oder mit zwei Fingern zoomen · ziehen zum Verschieben · Handy quer drehen für ein größeres Bild</div>`;
   document.body.appendChild(d);document.body.classList.add('zvopen');ZV.el=d;
   const b=d.querySelector('.zvb');
-  d.addEventListener('click',e=>{const k=e.target.closest('[data-zv]');if(!k)return;const a=k.dataset.zv;if(a==='close')zvClose();else zvSet(ZV.z*(a==='in'?1.5:1/1.5));});
+  d.addEventListener('click',e=>{const k=e.target.closest('[data-zv]');if(!k)return;const a=k.dataset.zv;if(a==='close')zvClose();else if(a==='fill')zvSet(Math.abs(ZV.z-ZV.fill)<.02?1:ZV.fill);else zvSet(ZV.z*(a==='in'?1.5:1/1.5));});
   let lastTap=0;
   b.addEventListener('dblclick',e=>{zvTap(e.clientX,e.clientY);});
   b.addEventListener('touchend',e=>{if(e.touches.length||e.changedTouches.length!==1)return;const t=Date.now();if(t-lastTap<300){const c=e.changedTouches[0];zvTap(c.clientX,c.clientY);e.preventDefault();lastTap=0;}else lastTap=t;},{passive:false});
@@ -770,20 +770,23 @@ function zvOpen(html,title){
   b.addEventListener('wheel',e=>{if(e.ctrlKey){e.preventDefault();zvSet(ZV.z*(e.deltaY<0?1.1:1/1.1),e.clientX,e.clientY);}},{passive:false});
   zvSet(1);const im=d.querySelector('.zvi img');if(im&&!im.complete)im.addEventListener('load',()=>zvSet(ZV.z),{once:true});window.addEventListener('resize',zvFit);const c=d.querySelector('[data-zv="close"]');if(c)c.focus();
 }
-function zvTap(x,y){zvSet(ZV.z>1.4?1:2.5,x,y);}
+function zvTap(x,y){zvSet(ZV.z>1.4?1:Math.max(2.5,ZV.fill||1),x,y);}
 function zvSet(z,cx,cy){
   const d=ZV.el;if(!d)return;const b=d.querySelector('.zvb'),i=d.querySelector('.zvi');
-  z=Math.max(1,Math.min(5,z));const r=b.getBoundingClientRect();
-  if(cx==null){cx=r.left+r.width/2;cy=r.top+r.height/2;}
-  const ox=(b.scrollLeft+cx-r.left)/ZV.z,oy=(b.scrollTop+cy-r.top)/ZV.z;
+  const bw=b.clientWidth,bh=b.clientHeight;
   const el=i.firstElementChild;let ar=1.6;
   if(el&&el.tagName==='IMG'&&el.naturalWidth)ar=el.naturalWidth/el.naturalHeight;
   else if(el&&el.viewBox&&el.viewBox.baseVal&&el.viewBox.baseVal.height)ar=el.viewBox.baseVal.width/el.viewBox.baseVal.height;
-  const base=Math.min(r.width,(r.height-8)*ar);
-  ZV.z=z;i.style.width=Math.round(base*z)+'px';i.style.marginTop=z>1.01?Math.max(0,(r.height-base*z/ar)/2)+'px':'';
-  b.scrollLeft=ox*z-(cx-r.left);b.scrollTop=oy*z-(cy-r.top);
-  b.classList.toggle('zoomed',z>1.01);
+  const base=Math.min(bw,bh*ar);ZV.fill=bh*ar/base;
+  z=Math.max(1,Math.min(Math.max(5,ZV.fill),z));
+  const r=b.getBoundingClientRect();if(cx==null){cx=r.left+bw/2;cy=r.top+bh/2;}
+  const ow=base*ZV.z,oh=ow/ar,ml0=Math.max(0,(bw-ow)/2),mt0=Math.max(0,(bh-oh)/2);
+  const fx=(b.scrollLeft+cx-r.left-ml0)/ow,fy=(b.scrollTop+cy-r.top-mt0)/oh;
+  ZV.z=z;const w=base*z,h=w/ar,ml=Math.max(0,(bw-w)/2),mt=Math.max(0,(bh-h)/2);
+  i.style.width=w+'px';i.style.height=h+'px';i.style.marginLeft=ml+'px';i.style.marginTop=mt+'px';
+  b.scrollLeft=Math.max(0,fx*w+ml-(cx-r.left));b.scrollTop=Math.max(0,fy*h+mt-(cy-r.top));
   const l=d.querySelector('.zvz');if(l)l.textContent=Math.round(z*100)+' %';
+  const f=d.querySelector('[data-zv="fill"]');if(f){f.hidden=ZV.fill<1.15;f.textContent=Math.abs(z-ZV.fill)<.02?'Ganzes Bild':'Bildschirm füllen';}
 }
 function zvFit(){if(ZV.el)zvSet(ZV.z);}
 function zvClose(){window.removeEventListener('resize',zvFit);if(ZV.el){ZV.el.remove();ZV.el=null;}document.body.classList.remove('zvopen');}
@@ -911,7 +914,7 @@ function nextItem(){
 }
 function finish(){
   clearInterval(tick);stopSpeak();zvClose();
-  const R=S.res,ok=R.filter(r=>r.ok).length,n=Math.max(R.length,qCount());
+  const R=S.res,ok=R.filter(r=>r.ok).length,n=S.mode==='exam'?Math.max(R.length,qCount()):R.length;
   const res={title:S.title,mode:S.mode,ok,n,R,items:S.items,meta:S.meta,dur:Date.now()-S.t0};
   if(S.mode==='plan'&&S.meta.unit!=null){const P=plan();if(!P.done.includes(S.meta.unit))P.done.push(S.meta.unit);}
   if(S.mode==='einst'){ST.einst={t:Date.now(),ok,n};ST.plan=null;}
@@ -926,7 +929,8 @@ function finish(){
 let LAST=null;
 function resultView(){
   const r=LAST;if(!r)return homeView();
-  const p=r.n?Math.round(100*r.ok/r.n):0;
+  if(!r.n)return `<div class="res"><div class="kick">${H(r.title)}</div><h1 class="lt">Runde beendet</h1><p class="lead">Keine Aufgabe beantwortet.</p></div><button class="btn dark" data-a="tab" data-v="${V.tab}">Fertig</button>`;
+  const p=Math.round(100*r.ok/r.n);
   const byA={};r.R.forEach(x=>{const a=x.q.area;byA[a]=byA[a]||{ok:0,n:0};byA[a].n++;if(x.ok)byA[a].ok++;});
   const scImgs=[...new Set(r.R.filter(x=>x.sc).map(x=>x.sc))].map(id=>SCENES.find(s=>s.id===id));
   const msg=p>=85?'Sehr stark.':p>=70?'Gut gemacht.':p>=50?'Solide Basis, da geht noch mehr.':'Dranbleiben, Fehler kommen gezielt wieder.';
