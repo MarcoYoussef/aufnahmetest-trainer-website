@@ -75,7 +75,7 @@ async function cloudPull(){
     C.state='ok';await cloudPush();
   }catch(e){clearTimeout(to);C.state='err';C.err=e&&e.code||'';refreshAcct();}
 }
-function cloudQueue(){if(ST.acct!=='cloud'||!C.db)return;clearTimeout(C.t);C.t=setTimeout(cloudPush,2500);}
+function cloudQueue(){if(ST.acct==='sb'){sbQueue();return;}if(ST.acct!=='cloud'||!C.db)return;clearTimeout(C.t);C.t=setTimeout(cloudPush,2500);}
 async function cloudPush(){
   if(ST.acct!=='cloud'||!C.db)return;
   if(C.writing){C.pending=true;return;}
@@ -86,11 +86,148 @@ async function cloudPush(){
   if(C.pending){C.pending=false;cloudPush();}
 }
 function acctLabel(){
+  if(ST.acct==='sb')return A.user?({sync:['Wird abgeglichen …','dim'],ok:['Gesichert'+(A.last?' · '+new Date(A.last).toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'}):''),'ok'],err:['Sichern fehlgeschlagen','bad'],mfa:['2FA-Code nötig','warn']})[A.state]||['Angemeldet','ok']:['Abgemeldet','warn'];
   if(ST.acct!=='cloud')return ['Nur auf diesem Gerät','dim'];
   return ({wait:['Verbinde …','dim'],sync:['Wird abgeglichen …','dim'],slow:['Speicher antwortet noch nicht','warn'],ok:['Gesichert'+(C.last?' · '+new Date(C.last).toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'}):''),'ok'],err:['Sichern fehlgeschlagen','bad'],na:['Konto hier nicht verfügbar','warn'],ready:['Bereit','dim']})[C.state]||['–','dim'];
 }
 function refreshAcct(){document.querySelectorAll('[data-acct]').forEach(el=>{const [t,c]=acctLabel();el.textContent=t;el.className='acct '+c;});}
 
+
+/* ================= Konto auf der eigenen Website (Supabase: E-Mail oder Benutzername, Passwort, 2FA) ================= */
+const SB_URL='https://hppzxcsvnewdorkidjbb.supabase.co',SB_KEY='sb_publishable_kqw72gF8caWsAKPDVdjHfQ_9jHKOJCg',UDOM='@nutzer.aufnahmetest.invalid';
+const IS_LINK=/claude/.test(location.hostname)||window.top!==window;
+const A={sb:null,user:null,aal:null,next:null,factors:[],state:'off',last:0,t:null,writing:false,pending:false,mode:'in',kind:'mail',msg:'',busy:false,enroll:null,recovery:false};
+function sbInit(){
+  if(IS_LINK||!window.supabase||!window.supabase.createClient)return;
+  try{A.sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});}catch(e){A.sb=null;return;}
+  A.sb.auth.onAuthStateChange((ev,session)=>{
+    if(ev==='PASSWORD_RECOVERY'){A.recovery=true;setTimeout(()=>{V.view='auth';render();},0);return;}
+    setTimeout(()=>sbAfterAuth(session),0);
+  });
+}
+const uname=u=>u&&u.email&&u.email.endsWith(UDOM)?u.email.slice(0,-UDOM.length):null;
+const whoLabel=()=>A.user?(uname(A.user)||A.user.email):'';
+async function sbAfterAuth(session){
+  A.user=session?session.user:null;
+  if(!A.user){if(ST.acct==='sb'){A.state='off';}render();return;}
+  try{const {data}=await A.sb.auth.mfa.getAuthenticatorAssuranceLevel();A.aal=data.currentLevel;A.next=data.nextLevel;}catch(e){}
+  try{const {data}=await A.sb.auth.mfa.listFactors();A.factors=(data&&data.totp||[]).filter(f=>f.status==='verified');}catch(e){A.factors=[];}
+  if(A.next==='aal2'&&A.aal!=='aal2'){A.state='mfa';V.view='auth';render();return;}
+  if(!ST.onb){ST.onb=true;}
+  ST.acct='sb';await sbPull();
+  if(V.view==='auth'&&!A.recovery){V.view=V.tab='me';stack.length=0;}
+  render();
+  if(A.newAcct&&!A.factors.length){A.newAcct=false;sheet(`<h2>Konto erstellt</h2><p class="sub">Dein Fortschritt wird ab jetzt gesichert. Willst du die Zwei-Faktor-Anmeldung (2FA) einschalten? Dauert 1 Minute mit einer Authenticator-App.</p><div class="stackb"><button class="btn dark" data-a="au-mfa-go">2FA jetzt einschalten</button><button class="btn ghost" data-a="sclose">Später</button></div>`);}
+}
+async function sbPull(){
+  if(!A.sb||!A.user)return;A.state='sync';refreshAcct();
+  try{
+    const {data,error}=await A.sb.from('fortschritt').select('stand,geaendert').eq('user_id',A.user.id).maybeSingle();
+    if(error)throw error;
+    if(data&&data.stand&&data.stand.v===1&&(data.geaendert||0)>(ST.upd||0)){const th=ST.theme;ST=Object.assign(fresh(),data.stand);ST.acct='sb';ST.onb=true;if(!ST.theme)ST.theme=th;try{localStorage.setItem(SKEY,JSON.stringify(ST));}catch(e){}A.state='ok';A.last=Date.now();applyTheme();render();return;}
+    A.state='ok';await sbPush();
+  }catch(e){A.state='err';refreshAcct();}
+}
+function sbQueue(){if(ST.acct!=='sb'||!A.user)return;clearTimeout(A.t);A.t=setTimeout(sbPush,2500);}
+async function sbPush(){
+  if(ST.acct!=='sb'||!A.sb||!A.user)return;
+  if(A.writing){A.pending=true;return;}A.writing=true;
+  try{const {error}=await A.sb.from('fortschritt').upsert({user_id:A.user.id,stand:ST,geaendert:ST.upd||Date.now(),updated_at:new Date().toISOString()});if(error)throw error;A.state='ok';A.last=Date.now();}
+  catch(e){A.state='err';}
+  A.writing=false;refreshAcct();if(A.pending){A.pending=false;sbPush();}
+}
+const pwOk=p=>p.length>=8&&/[a-zA-Z]/.test(p)&&/\d/.test(p);
+async function sbSubmit(){
+  const f=id=>{const e=document.getElementById(id);return e?e.value:'';};
+  const id=f('auid').trim(),pw=f('aupw'),pw2=f('aupw2');
+  A.msg='';A.busy=true;render();
+  try{
+    if(A.mode==='up'){
+      if(!pwOk(pw))throw new Error('Passwort: mindestens 8 Zeichen, mit Buchstaben und Ziffern.');
+      if(pw!==pw2)throw new Error('Die beiden Passwörter stimmen nicht überein.');
+      if(A.kind==='mail'){
+        if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(id))throw new Error('Bitte eine gültige E-Mail-Adresse eingeben.');
+        const {data,error}=await A.sb.auth.signUp({email:id,password:pw,options:{emailRedirectTo:location.origin+location.pathname}});
+        if(error)throw error;
+        if(!data.session){A.msg='Fast fertig: Wir haben dir eine E-Mail geschickt. Tippe auf den Link darin, dann bist du angemeldet. (Auch im Spam-Ordner nachsehen.)';A.busy=false;render();return;}
+      }else{
+        const r=await fetch(SB_URL+'/functions/v1/benutzer-anlegen',{method:'POST',headers:{'Content-Type':'application/json',apikey:SB_KEY},body:JSON.stringify({benutzer:id,passwort:pw})});
+        const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Konto konnte nicht angelegt werden.');
+        const {error}=await A.sb.auth.signInWithPassword({email:id.toLowerCase()+UDOM,password:pw});if(error)throw error;
+      }
+      A.newAcct=true;
+    }else{
+      const email=id.includes('@')?id:id.toLowerCase()+UDOM;
+      const {error}=await A.sb.auth.signInWithPassword({email,password:pw});if(error)throw error;
+    }
+  }catch(e){A.msg=authMsg(e);}
+  A.busy=false;render();
+}
+function authMsg(e){const m=String(e&&e.message||e);
+  if(/Invalid login/i.test(m))return 'Anmeldung fehlgeschlagen: Name/E-Mail oder Passwort falsch.';
+  if(/Email not confirmed/i.test(m))return 'Bitte zuerst die E-Mail bestätigen (Link in deinem Postfach).';
+  if(/already registered|already exists/i.test(m))return 'Für diese E-Mail gibt es schon ein Konto. Melde dich an.';
+  if(/rate limit|too many/i.test(m))return 'Zu viele Versuche. Bitte ein paar Minuten warten.';
+  if(/Failed to fetch|NetworkError/i.test(m))return 'Keine Verbindung. Bitte Internet prüfen.';
+  return m;}
+async function sbMfaVerify(){
+  const c=(document.getElementById('aucode')||{}).value||'';if(!/^\d{6}$/.test(c.trim())){A.msg='Bitte den 6-stelligen Code eingeben.';render();return;}
+  A.busy=true;A.msg='';render();
+  try{
+    if(A.enroll){const {error}=await A.sb.auth.mfa.challengeAndVerify({factorId:A.enroll.id,code:c.trim()});if(error)throw error;A.enroll=null;toast('2FA ist eingeschaltet');}
+    else{const {data}=await A.sb.auth.mfa.listFactors();const fct=(data.totp||[]).find(f=>f.status==='verified');const {error}=await A.sb.auth.mfa.challengeAndVerify({factorId:fct.id,code:c.trim()});if(error)throw error;}
+    A.busy=false;const {data:{session}}=await A.sb.auth.getSession();await sbAfterAuth(session);if(V.view==='auth'){V.view=V.tab='me';}render();return;
+  }catch(e){A.msg=/invalid|expired/i.test(String(e.message))?'Code falsch oder abgelaufen. Nimm den aktuellen Code aus der App.':authMsg(e);}
+  A.busy=false;render();
+}
+async function sbMfaStart(){
+  A.busy=true;render();
+  try{const old=await A.sb.auth.mfa.listFactors();for(const f of (old.data&&old.data.totp||[]))if(f.status!=='verified')await A.sb.auth.mfa.unenroll({factorId:f.id});
+    const {data,error}=await A.sb.auth.mfa.enroll({factorType:'totp',friendlyName:'Aufnahmetest Trainer'});if(error)throw error;
+    A.enroll={id:data.id,qr:data.totp.qr_code,secret:data.totp.secret,uri:data.totp.uri};A.msg='';V.view='auth';A.state2='enroll';
+  }catch(e){toast(authMsg(e));}
+  A.busy=false;render();
+}
+async function sbMfaOff(){
+  try{if(A.aal!=='aal2'){toast('Melde dich zuerst mit 2FA-Code an.');return;}for(const f of A.factors){const {error}=await A.sb.auth.mfa.unenroll({factorId:f.id});if(error)throw error;}
+    A.factors=[];await A.sb.auth.refreshSession();toast('2FA ausgeschaltet');}catch(e){toast(authMsg(e));}
+  render();
+}
+async function sbReset(){
+  const id=((document.getElementById('auid')||{}).value||'').trim();
+  if(!id.includes('@')){A.msg='Passwort-Reset geht nur bei Konten mit E-Mail. Gib oben deine E-Mail ein.';render();return;}
+  try{const {error}=await A.sb.auth.resetPasswordForEmail(id,{redirectTo:location.origin+location.pathname});if(error)throw error;A.msg='Wir haben dir einen Link zum Zurücksetzen geschickt.';}catch(e){A.msg=authMsg(e);}
+  render();
+}
+async function sbNewPw(){
+  const p=(document.getElementById('aunew')||{}).value||'';if(!pwOk(p)){A.msg='Passwort: mindestens 8 Zeichen, mit Buchstaben und Ziffern.';render();return;}
+  const {error}=await A.sb.auth.updateUser({password:p});if(error){A.msg=authMsg(error);render();return;}
+  A.recovery=false;toast('Neues Passwort gespeichert');V.view=V.tab='me';render();
+}
+async function sbOut(){try{await A.sb.auth.signOut();}catch(e){}A.user=null;A.factors=[];ST.acct='local';save();toast('Abgemeldet. Dein Stand bleibt auf diesem Gerät.');render();}
+function authView(){
+  if(!A.sb)return head('Konto',null,'Zurück')+'<div class="card"><p class="sub">Konten gibt es in der Website-Fassung. Im Claude-Link läuft die Sicherung über dein Claude-Konto (Profil).</p></div>';
+  const msg=A.msg?`<div class="amsg" role="alert">${H(A.msg)}</div>`:'';
+  if(A.recovery)return head('Neues Passwort')+`<div class="card"><label class="fl">Neues Passwort<input class="in" id="aunew" type="password" autocomplete="new-password"></label>${msg}<button class="btn" data-a="au-newpw">Speichern</button></div>`;
+  if(A.enroll)return head('2FA einrichten',null,'Profil')+`<div class="card"><ol class="lx"><li>Öffne eine Authenticator-App (z. B. Google Authenticator, Microsoft Authenticator oder Apple Passwörter).</li><li>Scanne den QR-Code. Am iPhone kannst du auch den Schlüssel kopieren und einfügen.</li><li>Gib den 6-stelligen Code ein.</li></ol>
+    <div class="qr"><img src="${H(A.enroll.qr)}" alt="QR-Code für die Authenticator-App"></div>
+    <label class="fl">Schlüssel<input class="in mono" readonly value="${H(A.enroll.secret)}" id="ausec"></label><button class="pill" data-a="au-copysec">Schlüssel kopieren</button>
+    <label class="fl">Code aus der App<input class="in big" id="aucode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"></label>${msg}
+    <button class="btn" data-a="au-verify" ${A.busy?'disabled':''}>Bestätigen und einschalten</button><button class="btn ghost" data-a="au-enrollx">Abbrechen</button></div>`;
+  if(A.state==='mfa')return head('Bestätigung mit 2FA')+`<div class="card"><p class="sub">Gib den 6-stelligen Code aus deiner Authenticator-App ein.</p><label class="fl">Code<input class="in big" id="aucode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"></label>${msg}<button class="btn" data-a="au-verify" ${A.busy?'disabled':''}>Anmelden</button><button class="btn ghost" data-a="au-out">Abbrechen</button></div>`;
+  const up=A.mode==='up',mail=A.kind==='mail';
+  return head(up?'Konto erstellen':'Anmelden',up?'Dein Fortschritt wird gesichert und auf jedem Gerät abgeglichen. Kostenlos, kein Abo.':null,'Zurück')+`
+   <div class="seg"><button class="${!up?'on':''}" data-a="au-mode" data-v="in">Anmelden</button><button class="${up?'on':''}" data-a="au-mode" data-v="up">Registrieren</button></div>
+   ${up?`<div class="seg sm2"><button class="${mail?'on':''}" data-a="au-kind" data-v="mail">Mit E-Mail</button><button class="${!mail?'on':''}" data-a="au-kind" data-v="user">Mit Benutzername</button></div>`:''}
+   <form class="card" data-a="au-form">
+    <label class="fl">${up?(mail?'E-Mail-Adresse':'Benutzername'):'E-Mail oder Benutzername'}<input class="in" id="auid" ${up&&mail?'type="email" autocomplete="email"':'autocomplete="username" autocapitalize="off"'} spellcheck="false" required></label>
+    <label class="fl">Passwort<input class="in" id="aupw" type="password" autocomplete="${up?'new-password':'current-password'}" required></label>
+    ${up?`<label class="fl">Passwort wiederholen<input class="in" id="aupw2" type="password" autocomplete="new-password" required></label><p class="fine left">Mindestens 8 Zeichen, mit Buchstaben und Ziffern.${mail?'':' Ohne E-Mail kann ein vergessenes Passwort nicht zurückgesetzt werden.'}</p>`:''}
+    ${msg}<button class="btn" type="submit" ${A.busy?'disabled':''}>${A.busy?'Bitte warten …':up?'Konto erstellen':'Anmelden'}</button>
+    ${up?'':'<button type="button" class="lnk" data-a="au-reset">Passwort vergessen?</button>'}
+   </form>
+   <p class="fine left">${ST.log.length?'Dein bisheriger Fortschritt auf diesem Gerät wird ins Konto übernommen.':''} Nach dem Anmelden kannst du im Profil die Zwei-Faktor-Anmeldung (2FA) einschalten.</p>`;
+}
 /* ================= KI und Vorlesen ================= */
 let AI=null,TT=null;
 
@@ -192,12 +329,12 @@ function head(title,sub,backLabel){
 }
 function render(){
   applyTheme();
-  if(!ST.onb&&!S){app.innerHTML=onbView();document.body.className='onb';return;}
+  if(!ST.onb&&!S&&V.view!=='auth'){app.innerHTML=onbView();document.body.className='onb';return;}
   if(S){document.body.className='sess';app.innerHTML=sessView();afterSess();plRender();return;}
-  document.body.className='';
+  document.body.className=ST.onb?'':'onb';
   const v=V.view;let h='';
   try{
-    h=({home:homeView,learn:learnView,know:knowView,me:meView,area:areaView,scenes:scenesView,passages:passView,lex:lexView,kquiz:kquizView,iv:ivView,dk:dkView,chk:chkView,sport:sportView,stats:statsView,data:dataView,result:resultView})[v]();
+    h=({home:homeView,learn:learnView,know:knowView,me:meView,area:areaView,scenes:scenesView,passages:passView,lex:lexView,kquiz:kquizView,iv:ivView,dk:dkView,chk:chkView,sport:sportView,auth:authView,stats:statsView,data:dataView,result:resultView})[v]();
   }catch(e){h=`<div class="card"><b>Fehler beim Anzeigen</b><p class="sub">${H(e.message)}</p><button class="btn" data-a="tab" data-v="home">Zur Startseite</button></div>`;console.error(e);}
   app.innerHTML=`<main class="wrap">${h}</main>${nav()}`;
   refreshAcct();plRender();
@@ -214,10 +351,10 @@ function onbView(){
    <ol class="steps"><li><span>1</span>Kurze Einstufung, alle 6 Testbereiche</li><li><span>2</span>Testdatum eintragen, Plan entsteht</li><li><span>3</span>Täglich 20 Minuten, die App passt sich an</li></ol>
    <div class="grow"></div>
    <div class="stackb">
-    <button class="btn dark" data-a="ob-cloud">${ICO(I.cloud,20)} Mit Konto starten</button>
-    <button class="btn" data-a="ob-local">Ohne Konto starten</button>
+    ${A.sb?`<button class="btn dark" data-a="au-go" data-v="up">${ICO(I.cloud,20)} Konto erstellen</button><button class="btn ghost" data-a="au-go" data-v="in">Anmelden</button><button class="btn" data-a="ob-local">Als Gast starten</button>`:`<button class="btn dark" data-a="ob-cloud">${ICO(I.cloud,20)} Mit Konto starten</button>
+    <button class="btn" data-a="ob-local">Ohne Konto starten</button>`}
    </div>
-   <p class="fine" id="obnote">Ohne Konto bleibt alles nur auf diesem Gerät. Mit Konto wird dein Fortschritt privat gesichert und auf iPhone und PC abgeglichen, sobald du diesen Link angemeldet öffnest. Kostenlos, kein Abo.</p>
+   <p class="fine" id="obnote">${A.sb?'Als Gast bleibt alles nur auf diesem Gerät. Ein Konto (E-Mail oder Benutzername, Passwort, auf Wunsch 2FA) sichert deinen Fortschritt auf allen Geräten. Kostenlos, kein Abo.':''}${A.sb?'':`Ohne Konto bleibt alles nur auf diesem Gerät. Mit Konto wird dein Fortschritt privat gesichert und auf iPhone und PC abgeglichen, sobald du diesen Link angemeldet öffnest. Kostenlos, kein Abo.`}</p>
   </div>`;
   if(OB===1)return `<div class="onbw">
    <button class="back" data-a="ob-back">${ICO(I.back,20)}<span>Zurück</span></button>
@@ -423,11 +560,7 @@ function meView(){
    `<div class="frow"><div><b>${eng==='hb'?'Hörbuch-Stimme':'Gerätestimme'}</b></div><div class="seg sm"><button class="${ST.tts.sex==='w'?'on':''}" data-a="set" data-k="tts.sex" data-v="w">Weiblich</button><button class="${ST.tts.sex==='m'?'on':''}" data-a="set" data-k="tts.sex" data-v="m">Männlich</button></div></div>`;
   return head('Profil')+`
    <div class="card prof"><div class="avatar xl">${H(initials())}</div><div><b class="pn">${H(ST.name||'Ohne Namen')}</b><span class="sub">Ziel: Polizei Steiermark</span><span data-acct class="acct ${ac}">${H(al)}</span></div></div>
-   <div class="card">
-    <div class="ch"><b>Konto</b></div>
-    ${ST.acct==='cloud'?`<p class="sub">Dein Fortschritt wird privat in deinem Claude-Konto gesichert. Öffnest du diesen Link am PC oder iPhone angemeldet, ist alles da. Niemand sonst sieht deine Daten.</p><div class="row"><button class="btn sm alt" data-a="sync">Jetzt abgleichen</button><button class="btn sm ghost" data-a="acct-off">Nur noch auf diesem Gerät</button></div>`
-    :`<p class="sub">Gerade bleibt alles nur auf diesem Gerät. Mit Konto wird dein Fortschritt gesichert und geräteübergreifend abgeglichen.</p><button class="btn sm" data-a="acct-on" ${C.state==='na'?'disabled':''}>${ICO(I.cloud,18)} Mit Konto sichern</button>${C.state==='na'?'<p class="fine left">Konto ist nur verfügbar, wenn du diesen Link in Claude angemeldet öffnest. Daten übertragen geht immer über „Sichern und übertragen“.</p>':''}`}
-   </div>
+   ${A.sb?sbCard():claudeCard()}
    <div class="card">
     <div class="ch"><b>Ziel</b></div>
     <label class="fl">Vorname<input class="in" id="pname" value="${H(ST.name)}" data-a="pname"></label>
@@ -451,6 +584,19 @@ function meView(){
    <div class="list">${row('data','Sichern und übertragen','Code kopieren, auf anderem Gerät einfügen','#6C6C70',I.cloud)}</div>
    <button class="btn ghost danger" data-a="reset">Alle Daten auf diesem Gerät löschen</button>
    <p class="fine left">Inoffizielle Übungs-App mit selbst geschriebenen und erzeugten Aufgaben. Nicht vom Innenministerium oder der Polizei. Kein Abo, keine Werbung.</p>`;
+}
+function claudeCard(){return `   <div class="card">
+    <div class="ch"><b>Konto</b></div>
+    ${ST.acct==='cloud'?`<p class="sub">Dein Fortschritt wird privat in deinem Claude-Konto gesichert. Öffnest du diesen Link am PC oder iPhone angemeldet, ist alles da. Niemand sonst sieht deine Daten.</p><div class="row"><button class="btn sm alt" data-a="sync">Jetzt abgleichen</button><button class="btn sm ghost" data-a="acct-off">Nur noch auf diesem Gerät</button></div>`
+    :`<p class="sub">Gerade bleibt alles nur auf diesem Gerät. Mit Konto wird dein Fortschritt gesichert und geräteübergreifend abgeglichen.</p><button class="btn sm" data-a="acct-on" ${C.state==='na'?'disabled':''}>${ICO(I.cloud,18)} Mit Konto sichern</button>${C.state==='na'?'<p class="fine left">Konto ist nur verfügbar, wenn du diesen Link in Claude angemeldet öffnest. Daten übertragen geht immer über „Sichern und übertragen“.</p>':''}`}
+   </div>`;}
+function sbCard(){
+  if(!A.user)return `<div class="card"><div class="ch"><b>Konto</b></div><p class="sub">Du bist als Gast unterwegs, alles bleibt nur auf diesem Gerät. Mit Konto wird dein Fortschritt gesichert und auf jedem Gerät abgeglichen.</p><div class="row"><button class="btn sm" data-a="au-go" data-v="up">${ICO(I.cloud,18)} Konto erstellen</button><button class="btn sm alt" data-a="au-go" data-v="in">Anmelden</button></div></div>`;
+  const on=A.factors.length>0;
+  return `<div class="card"><div class="ch"><b>Konto</b><span data-acct class="acct"></span></div>
+   <p class="sub">Angemeldet als <b>${H(whoLabel())}</b></p>
+   <div class="frow"><div><b>Zwei-Faktor-Anmeldung (2FA)</b><small>${on?'Eingeschaltet: Beim Anmelden braucht es zusätzlich den Code aus deiner Authenticator-App.':'Aus. Empfohlen: schützt dein Konto, auch wenn jemand dein Passwort kennt.'}</small></div>${on?'<button class="btn sm ghost" data-a="au-mfa-off">Ausschalten</button>':'<button class="btn sm" data-a="au-mfa-on">Einschalten</button>'}</div>
+   <div class="row"><button class="btn sm alt" data-a="sb-sync">Jetzt abgleichen</button><button class="btn sm ghost" data-a="au-out">Abmelden</button></div></div>`;
 }
 function sw(k,on){return `<button class="sw" role="switch" aria-checked="${!!on}" data-a="tog" data-k="${k}"><span class="swt"><span class="swk"></span></span></button>`;}
 function badges(){
@@ -731,6 +877,21 @@ document.addEventListener('click',ev=>{
   const a=b.dataset.a,v=b.dataset.v,x=b.dataset.x;
   switch(a){
    case 'tab':tab(v);break;
+   case 'au-go':A.mode=v||'in';A.kind='mail';A.msg='';A.recovery=false;if(V.view!=='auth')stack.push(Object.assign({},V));V.view='auth';render();window.scrollTo(0,0);break;
+   case 'au-mode':A.mode=v;A.msg='';render();break;
+   case 'au-kind':A.kind=v;A.msg='';render();break;
+   case 'au-verify':sbMfaVerify();break;
+   case 'au-reset':sbReset();break;
+   case 'au-newpw':sbNewPw();break;
+   case 'au-enrollx':(async()=>{try{if(A.enroll)await A.sb.auth.mfa.unenroll({factorId:A.enroll.id});}catch(e){}A.enroll=null;tab('me');})();break;
+   case 'au-copysec':{const t=document.getElementById('ausec');try{navigator.clipboard.writeText(t.value).then(()=>toast('Schlüssel kopiert'));}catch(e){t.select();document.execCommand('copy');toast('Schlüssel kopiert');}break;}
+   case 'au-out':A.state='off';A.msg='';sbOut();tab('me');break;
+   case 'au-mfa-on':sbMfaStart();break;
+   case 'au-mfa-go':closeSheet();sbMfaStart();break;
+   case 'au-mfa-off':sheet(`<h2>2FA ausschalten?</h2><p class="sub">Dann reicht wieder nur das Passwort zum Anmelden.</p><div class="stackb"><button class="btn red" data-a="au-mfa-off2">Ausschalten</button><button class="btn ghost" data-a="sclose">Abbrechen</button></div>`);break;
+   case 'au-mfa-off2':closeSheet();sbMfaOff();break;
+   case 'sb-sync':sbPull();break;
+
    case 'go':if(v==='cat'){start(CAT[x].t,catItems(x),'learn');break;}if(v==='me'||v==='learn'||v==='know'||v==='home'){tab(v);break;}go(v,x);break;
    case 'back':back();break;
    case 'seg':V.seg=v;render();break;
@@ -786,7 +947,7 @@ document.addEventListener('click',ev=>{
    case 'reset-go':{closeSheet();const acct=ST.acct;ST=fresh();ST.acct=acct;save();OB=0;V={tab:'home',view:'home',arg:null,seg:'t1'};render();break;}
   }
 });
-document.addEventListener('submit',ev=>{const f=ev.target.closest('[data-a="numform"]');if(!f)return;ev.preventDefault();const i=document.getElementById('ans');answer(i?i.value:'');});
+document.addEventListener('submit',ev=>{if(ev.target.closest('[data-a="au-form"]')){ev.preventDefault();sbSubmit();return;}const f=ev.target.closest('[data-a="numform"]');if(!f)return;ev.preventDefault();const i=document.getElementById('ans');answer(i?i.value:'');});
 document.addEventListener('input',ev=>{
   const t=ev.target;
   if(t.id==='note'){const id=t.dataset.nid;if(t.value.trim())ST.notes[id]=t.value;else delete ST.notes[id];clearTimeout(t._t);t._t=setTimeout(save,600);}
@@ -809,6 +970,6 @@ if('speechSynthesis' in window)try{speechSynthesis.onvoiceschanged=()=>{};speech
 
 const LOGO='<svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true"><rect width="64" height="64" rx="18" fill="#0A3D8F"/><path d="M32 13l15 5.6v11.2c0 9.4-6.4 17.4-15 20.6-8.6-3.2-15-11.2-15-20.6V18.6z" fill="none" stroke="#fff" stroke-width="3"/><path d="M25 32l5 5 9-10" fill="none" stroke="#FFCC00" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-render();capInit();
+sbInit();render();capInit();
 try{if('serviceWorker' in navigator&&location.protocol==='https:'&&!/claude/.test(location.hostname)&&window.top===window)navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){}
 })();
