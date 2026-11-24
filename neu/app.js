@@ -221,13 +221,37 @@ function authView(){
    ${up?`<div class="seg sm2"><button class="${mail?'on':''}" data-a="au-kind" data-v="mail">Mit E-Mail</button><button class="${!mail?'on':''}" data-a="au-kind" data-v="user">Mit Benutzername</button></div>`:''}
    <form class="card" data-a="au-form">
     <label class="fl">${up?(mail?'E-Mail-Adresse':'Benutzername'):'E-Mail oder Benutzername'}<input class="in" id="auid" ${up&&mail?'type="email" autocomplete="email"':'autocomplete="username" autocapitalize="off"'} spellcheck="false" required></label>
-    <label class="fl">Passwort<input class="in" id="aupw" type="password" autocomplete="${up?'new-password':'current-password'}" required></label>
+    <label class="fl">Passwort<span class="pwrow"><input class="in" id="aupw" type="password" autocomplete="${up?'new-password':'current-password'}" required><button type="button" class="pill" data-a="au-eye" aria-label="Passwort anzeigen">Zeigen</button></span></label>
     ${up?`<label class="fl">Passwort wiederholen<input class="in" id="aupw2" type="password" autocomplete="new-password" required></label><p class="fine left">Mindestens 8 Zeichen, mit Buchstaben und Ziffern.${mail?'':' Ohne E-Mail kann ein vergessenes Passwort nicht zurückgesetzt werden.'}</p>`:''}
     ${msg}<button class="btn" type="submit" ${A.busy?'disabled':''}>${A.busy?'Bitte warten …':up?'Konto erstellen':'Anmelden'}</button>
     ${up?'':'<button type="button" class="lnk" data-a="au-reset">Passwort vergessen?</button>'}
    </form>
    <p class="fine left">${ST.log.length?'Dein bisheriger Fortschritt auf diesem Gerät wird ins Konto übernommen.':''} Nach dem Anmelden kannst du im Profil die Zwei-Faktor-Anmeldung (2FA) einschalten.</p>`;
 }
+
+/* ================= Entwickler-Bereich (nur Konten mit Rolle "dev") ================= */
+const APPV='2026.11.24';
+const isDev=()=>!!(A.user&&A.user.app_metadata&&A.user.app_metadata.role==='dev');
+let DEVS=null;
+function devView(){
+  if(!isDev())return head('Entwickler',null,'Profil')+'<div class="card"><p class="sub">Nur für Entwickler-Konten.</p></div>';
+  const size=(()=>{try{return Math.round(JSON.stringify(ST).length/1024);}catch(e){return 0;}})();
+  const st=DEVS;
+  const kv=(k,v)=>`<div class="srow"><span>${H(k)}</span><b>${H(v)}</b></div>`;
+  return head('Entwickler',null,'Profil')+`
+   <div class="card"><div class="ch"><b>App und Konto</b></div>
+    ${kv('Version',APPV)}${kv('Konto',whoLabel())}${kv('Rolle','Entwickler')}${kv('2FA',A.factors.length?'an (Stufe '+(A.aal||'?')+')':'aus')}${kv('Sicherung',acctLabel()[0])}${kv('Lokaler Speicher',size+' KB')}${kv('Antworten im Protokoll',ST.log.length)}${kv('Fragen mit Lernstand',Object.keys(ST.qs).length)}</div>
+   <div class="card"><div class="ch"><b>Server</b><button class="lnk" data-a="dev-stats">Aktualisieren</button></div>
+    ${st?(st.err?`<p class="sub">${H(st.err)}</p>`:kv('Konten gesamt',st.konten)+kv('davon mit E-Mail',st.mit_email)+kv('mit 2FA',st.mit_2fa)+kv('mit gesichertem Fortschritt',st.mit_fortschritt)+kv('aktiv (7 Tage)',st.aktiv_7_tage)+kv('neu (7 Tage)',st.neu_7_tage)):'<p class="sub">Tippe auf „Aktualisieren“.</p>'}</div>
+   <div class="sec">Test-Werkzeuge</div>
+   <div class="card">
+    <div class="frow"><div><b>Stufe für alle Aufgaben</b><small>Generatoren-Schwierigkeit</small></div><div class="seg sm">${[1,2,3].map(n=>`<button data-a="dev-lv" data-v="${n}">${n}</button>`).join('')}</div></div>
+    <div class="row"><button class="btn sm alt" data-a="dev-plan">Tagesplan neu</button><button class="btn sm alt" data-a="dev-due">Alles fällig machen</button><button class="btn sm alt" data-a="dev-einst">Einstufung zurücksetzen</button><button class="btn sm alt" data-a="dev-wg">Fehlerliste leeren</button><button class="btn sm alt" data-a="dev-onb">Willkommen erneut zeigen</button></div>
+   </div>
+   <div class="card"><div class="ch"><b>Stand als JSON</b></div><textarea class="in ta mono" rows="5" readonly>${H(JSON.stringify(ST).slice(0,20000))}</textarea></div>
+   <p class="fine left">Rolle wird nur auf dem Server vergeben (Supabase, Tabelle privat.entwickler). Wer 2FA eingeschaltet hat, sieht die Server-Zahlen erst nach dem 2FA-Code.</p>`;
+}
+async function devStats(){try{const {data,error}=await A.sb.rpc('dev_statistik');if(error)throw error;DEVS=data;}catch(e){DEVS={err:'Nicht abrufbar: '+(e.message||e)};}render();}
 /* ================= KI und Vorlesen ================= */
 let AI=null,TT=null;
 
@@ -334,7 +358,7 @@ function render(){
   document.body.className=ST.onb?'':'onb';
   const v=V.view;let h='';
   try{
-    h=({home:homeView,learn:learnView,know:knowView,me:meView,area:areaView,scenes:scenesView,passages:passView,lex:lexView,kquiz:kquizView,iv:ivView,dk:dkView,chk:chkView,sport:sportView,auth:authView,stats:statsView,data:dataView,result:resultView})[v]();
+    h=({home:homeView,learn:learnView,know:knowView,me:meView,area:areaView,scenes:scenesView,passages:passView,lex:lexView,kquiz:kquizView,iv:ivView,dk:dkView,chk:chkView,sport:sportView,auth:authView,dev:devView,stats:statsView,data:dataView,result:resultView})[v]();
   }catch(e){h=`<div class="card"><b>Fehler beim Anzeigen</b><p class="sub">${H(e.message)}</p><button class="btn" data-a="tab" data-v="home">Zur Startseite</button></div>`;console.error(e);}
   app.innerHTML=`<main class="wrap">${h}</main>${nav()}`;
   refreshAcct();plRender();
@@ -581,11 +605,11 @@ function meView(){
     <div class="frow"><div><b>KI-Coach</b><small>${AI?'Erklärt Fehler, beantwortet Fragen':'In diesem Fenster nicht verfügbar'}</small></div>${sw('ki',ST.ki)}</div>
     <div class="frow"><div><b>Fragen pro Runde</b><small>Bei Themen und Wissen-Quiz</small></div><div class="seg sm">${[['alle','Alle'],['20','20'],['10','10']].map(([v,l])=>`<button class="${ST.round===v?'on':''}" data-a="set" data-k="round" data-v="${v}">${l}</button>`).join('')}</div></div>
    </div>
-   <div class="list">${row('data','Sichern und übertragen','Code kopieren, auf anderem Gerät einfügen','#6C6C70',I.cloud)}</div>
+   <div class="list">${row('data','Sichern und übertragen','Code kopieren, auf anderem Gerät einfügen','#6C6C70',I.cloud)}${isDev()?row('dev','Entwickler','Server-Zahlen, Test-Werkzeuge, Rohdaten','#111114',I.spark):''}</div>
    <button class="btn ghost danger" data-a="reset">Alle Daten auf diesem Gerät löschen</button>
    <p class="fine left">Inoffizielle Übungs-App mit selbst geschriebenen und erzeugten Aufgaben. Nicht vom Innenministerium oder der Polizei. Kein Abo, keine Werbung.</p>`;
 }
-function claudeCard(){return `   <div class="card">
+function claudeCard(){return `<div class="banner" style="margin-bottom:0"><span><b>Eigene Website mit Konto</b>E-Mail oder Benutzername, Passwort und 2FA gibt es auf der unabhängigen Website.</span><a class="btn sm" href="https://marcoyoussef.github.io/aufnahmetest-trainer-website/neu/" target="_blank" rel="noopener">Öffnen</a></div>   <div class="card">
     <div class="ch"><b>Konto</b></div>
     ${ST.acct==='cloud'?`<p class="sub">Dein Fortschritt wird privat in deinem Claude-Konto gesichert. Öffnest du diesen Link am PC oder iPhone angemeldet, ist alles da. Niemand sonst sieht deine Daten.</p><div class="row"><button class="btn sm alt" data-a="sync">Jetzt abgleichen</button><button class="btn sm ghost" data-a="acct-off">Nur noch auf diesem Gerät</button></div>`
     :`<p class="sub">Gerade bleibt alles nur auf diesem Gerät. Mit Konto wird dein Fortschritt gesichert und geräteübergreifend abgeglichen.</p><button class="btn sm" data-a="acct-on" ${C.state==='na'?'disabled':''}>${ICO(I.cloud,18)} Mit Konto sichern</button>${C.state==='na'?'<p class="fine left">Konto ist nur verfügbar, wenn du diesen Link in Claude angemeldet öffnest. Daten übertragen geht immer über „Sichern und übertragen“.</p>':''}`}
@@ -877,6 +901,14 @@ document.addEventListener('click',ev=>{
   const a=b.dataset.a,v=b.dataset.v,x=b.dataset.x;
   switch(a){
    case 'tab':tab(v);break;
+   case 'au-eye':{const i=document.getElementById('aupw'),j=document.getElementById('aupw2');const sh=i.type==='password';i.type=sh?'text':'password';if(j)j.type=i.type;b.textContent=sh?'Verbergen':'Zeigen';break;}
+   case 'dev-stats':devStats();break;
+   case 'dev-lv':CATS.forEach(c=>{if(c.gen)ST.lv[c.id]=+v;});save();toast('Stufe '+v+' für alle Generatoren');render();break;
+   case 'dev-plan':ST.plan=null;save();toast('Tagesplan wird neu erzeugt');break;
+   case 'dev-due':Object.values(ST.qs).forEach(r=>r.due=0);save();toast('Alle gelernten Fragen sind fällig');render();break;
+   case 'dev-einst':ST.einst=null;ST.plan=null;save();toast('Einstufung zurückgesetzt');break;
+   case 'dev-wg':ST.wg=[];Object.values(ST.qs).forEach(r=>r.w=0);save();toast('Fehlerliste geleert');break;
+   case 'dev-onb':ST.onb=false;OB=0;save();V={tab:'home',view:'home',arg:null,seg:'t1'};render();break;
    case 'au-go':A.mode=v||'in';A.kind='mail';A.msg='';A.recovery=false;if(V.view!=='auth')stack.push(Object.assign({},V));V.view='auth';render();window.scrollTo(0,0);break;
    case 'au-mode':A.mode=v;A.msg='';render();break;
    case 'au-kind':A.kind=v;A.msg='';render();break;

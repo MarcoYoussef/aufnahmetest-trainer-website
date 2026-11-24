@@ -1,5 +1,5 @@
 /* Offline-Betrieb (nur in der Website-Fassung, z. B. GitHub Pages). Hörbuch-Dateien werden beim ersten Abspielen zwischengespeichert. */
-const V='atn-2';
+const V='atn-3';
 const CORE=['./','index.html','data.js','wissen.js','audio.js','scenes.js','app.js','supabase.js','manifest.webmanifest','icon-180.png','icon-512.png','img/s1.jpg','img/s2.jpg','img/s3.jpg','img/s4.jpg','img/s5.jpg','img/s6.jpg'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(V).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==V&&k!=='atn-audio').map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
