@@ -251,6 +251,19 @@ tr.sp.rd td{background:#FFE066;color:#111}
 
 .pwrow{display:flex;gap:8px;align-items:center;margin-top:6px}.pwrow .in{margin:0}
 form.card .lnk{display:block;margin:6px auto 0}
+.conf{margin:12px 0 4px}.confb{display:flex;gap:8px;margin-top:6px}.confb .btn{flex:1;margin:0;padding:8px 6px}
+.rbtn.star{color:#FF9500;background:rgba(255,149,0,.14)}.rbtn.star svg{fill:#FF9500}
+.pat.bad{box-shadow:inset 4px 0 0 var(--amber),var(--sh)}.pat.nd{opacity:.7}
+.arw{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:10px 0;border-top:.5px solid var(--sep)}.arw:first-child{border-top:0}.arw p{margin:0 0 4px;font-size:15px}.arw small{color:var(--mute)}.arw.ok .rd{color:var(--ok)}.arw.bad .rd{color:var(--bad)}
+#nsearch,#qsearch{margin:6px 0 10px}
+.fcard{display:block;width:100%;border:0;background:none;padding:0;margin:12px 0;perspective:1200px;cursor:pointer;color:var(--ink);text-align:left}
+.fcard .fin{display:grid;transition:transform .4s cubic-bezier(.2,.8,.2,1);transform-style:preserve-3d}.fcard.on .fin{transform:rotateY(180deg)}
+.fcard .ff,.fcard .fb2{grid-area:1/1;display:flex;flex-direction:column;gap:12px;min-height:260px;background:var(--card);border-radius:24px;padding:22px;box-shadow:var(--sh);backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.fcard .fb2{transform:rotateY(180deg)}.fcard small{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+.fq{font-size:20px;font-weight:700;line-height:1.35;flex:1;white-space:pre-line}.fa{font-size:22px;font-weight:800;color:var(--ok)}.fe{font-size:15px;color:var(--ink2)}
+.brw{display:flex;flex-direction:column;align-items:center;gap:8px}.brc{width:132px;height:132px;border-radius:50%;background:var(--tint-bg);border:2px solid var(--tint);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--tint);transform:scale(.72)}
+.brc.in{transform:scale(1);transition:transform 4s ease-in-out}.brc.out{transform:scale(.72);transition:transform 6s ease-in-out}
+.legacy .card{margin:12px 0}.legacy .note{font-size:12px;color:var(--mute);margin:12px 4px}.legacy table.t{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px}.legacy table.t td{border-top:.5px solid var(--sep);padding:7px 4px;vertical-align:top}.legacy table.t td:first-child{white-space:nowrap;color:var(--mute);padding-right:10px}.legacy ul,.legacy ol{padding-left:18px}.legacy .sec{margin:22px 6px 8px}.legacy a{color:var(--tint)}
 /* Lösungsdarstellungen aus der Aufgaben-Engine */
 .mat{border-collapse:collapse;margin:4px auto}.mat td{border:1.5px solid var(--sep);width:52px;height:44px;text-align:center;font-weight:600;font-size:20px;font-variant-numeric:tabular-nums}
 .plate{display:inline-flex;align-items:center;gap:10px;background:#fff;color:#111;border:3px solid #111;border-radius:8px;padding:4px 14px 4px 0;font-family:ui-monospace,Menlo,monospace;font-size:26px;font-weight:800;letter-spacing:.06em;box-shadow:inset 0 5px 0 #C8102E,inset 0 -5px 0 #C8102E;overflow:hidden}
@@ -280,6 +293,7 @@ mark.diff{background:var(--bad);color:#fff;border-radius:3px;padding:0 1px;font-
 <script src="wissen.js"></script>
 <script src="audio.js"></script>
 <script src="scenes.js"></script>
+<script src="extra.js"></script>
 <script src="supabase.js"></script>
 <script src="app.js"></script>
 </body>

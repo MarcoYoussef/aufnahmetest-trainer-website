@@ -40,7 +40,7 @@ const I={
 /* ================= Zustand ================= */
 function fresh(){return {v:1,upd:0,name:'',test:'',onb:false,acct:'local',theme:'weiss',
  tts:{eng:'hb',cv:'buttery',sex:'w',rate:1,hl:true},ki:true,round:'alle',
- sp:{},qs:{},notes:{},wg:[],log:[],days:{},lv:{},sc:{},plan:null,iv:{},chk:{},lex:{},ex:[],einst:null,psg:{},dk:{n:0,ok:0}};}
+ sp:{},mk:{},rk:{},arch:[],conf:true,gkey:'',rem:'18:00',qs:{},notes:{},wg:[],log:[],days:{},lv:{},sc:{},plan:null,iv:{},chk:{},lex:{},ex:[],einst:null,psg:{},dk:{n:0,ok:0}};}
 let ST=(()=>{try{const s=JSON.parse(localStorage.getItem(SKEY)||'null');if(s&&s.v===1)return Object.assign(fresh(),s);}catch(e){}return fresh();})();
 let storeOK=true;
 function save(){ST.upd=Date.now();try{localStorage.setItem(SKEY,JSON.stringify(ST));storeOK=true;}catch(e){storeOK=false;}cloudQueue();}
@@ -64,7 +64,7 @@ async function capInit(){
   render();
 }
 const cdoc=()=>C.db.doc('data/users/'+C.uid+'/trainer');
-function packCloud(){const o=Object.assign({},ST);let s=JSON.stringify(o);if(s.length>230000){o.wg=[];o.log=ST.log.slice(-600);s=JSON.stringify(o);}return s;}
+function packCloud(){const o=Object.assign({},ST);delete o.gkey;let s=JSON.stringify(o);if(s.length>230000){o.wg=[];o.log=ST.log.slice(-600);s=JSON.stringify(o);}return s;}
 async function cloudPull(){
   if(!C.db)return;C.state='sync';refreshAcct();
   const to=setTimeout(()=>{if(C.state==='sync'){C.state='slow';refreshAcct();}},10000);
@@ -124,7 +124,7 @@ async function sbPull(){
   try{
     const {data,error}=await A.sb.from('fortschritt').select('stand,geaendert').eq('user_id',A.user.id).maybeSingle();
     if(error)throw error;
-    if(data&&data.stand&&data.stand.v===1&&(data.geaendert||0)>(ST.upd||0)){const th=ST.theme;ST=Object.assign(fresh(),data.stand);ST.acct='sb';ST.onb=true;if(!ST.theme)ST.theme=th;try{localStorage.setItem(SKEY,JSON.stringify(ST));}catch(e){}A.state='ok';A.last=Date.now();applyTheme();render();return;}
+    if(data&&data.stand&&data.stand.v===1&&(data.geaendert||0)>(ST.upd||0)){const th=ST.theme,gk=ST.gkey;ST=Object.assign(fresh(),data.stand);ST.acct='sb';ST.onb=true;ST.gkey=gk;if(!ST.theme)ST.theme=th;try{localStorage.setItem(SKEY,JSON.stringify(ST));}catch(e){}A.state='ok';A.last=Date.now();applyTheme();render();return;}
     A.state='ok';await sbPush();
   }catch(e){A.state='err';refreshAcct();}
 }
@@ -132,7 +132,7 @@ function sbQueue(){if(ST.acct!=='sb'||!A.user)return;clearTimeout(A.t);A.t=setTi
 async function sbPush(){
   if(ST.acct!=='sb'||!A.sb||!A.user)return;
   if(A.writing){A.pending=true;return;}A.writing=true;
-  try{const {error}=await A.sb.from('fortschritt').upsert({user_id:A.user.id,stand:ST,geaendert:ST.upd||Date.now(),updated_at:new Date().toISOString()});if(error)throw error;A.state='ok';A.last=Date.now();}
+  try{const {error}=await A.sb.from('fortschritt').upsert({user_id:A.user.id,stand:Object.assign({},ST,{gkey:''}),geaendert:ST.upd||Date.now(),updated_at:new Date().toISOString()});if(error)throw error;A.state='ok';A.last=Date.now();}
   catch(e){A.state='err';}
   A.writing=false;refreshAcct();if(A.pending){A.pending=false;sbPush();}
 }
@@ -338,9 +338,9 @@ function unitItems(u){
 let V={tab:'home',view:'home',arg:null,seg:'t1'};
 let S=null;/* laufende Runde */
 const stack=[];
-function go(view,arg,keep){if(!keep)stack.push(Object.assign({},V));V.view=view;V.arg=arg;stopSpeak();render();window.scrollTo(0,0);}
+function go(view,arg,keep){ruStop();K=view==='karten'?K:null;if(!keep)stack.push(Object.assign({},V));V.view=view;V.arg=arg;stopSpeak();render();window.scrollTo(0,0);}
 function back(){const p=stack.pop();if(p){V=p;}else{V.view=V.tab;V.arg=null;}stopSpeak();render();window.scrollTo(0,0);}
-function tab(t){stack.length=0;V.tab=t;V.view=t;V.arg=null;stopSpeak();render();window.scrollTo(0,0);}
+function tab(t){ruStop();K=null;stack.length=0;V.tab=t;V.view=t;V.arg=null;stopSpeak();render();window.scrollTo(0,0);}
 
 /* ================= Rendering ================= */
 function applyTheme(){document.documentElement.setAttribute('data-th',ST.theme||'weiss');}
@@ -358,7 +358,7 @@ function render(){
   document.body.className=ST.onb?'':'onb';
   const v=V.view;let h='';
   try{
-    h=({home:homeView,learn:learnView,know:knowView,me:meView,area:areaView,scenes:scenesView,passages:passView,lex:lexView,kquiz:kquizView,iv:ivView,dk:dkView,chk:chkView,sport:sportView,auth:authView,dev:devView,stats:statsView,data:dataView,result:resultView})[v]();
+    h=({home:homeView,learn:learnView,know:knowView,me:meView,area:areaView,scenes:scenesView,passages:passView,lex:lexView,kquiz:kquizView,iv:ivView,dk:dkView,chk:chkView,sport:sportView,auth:authView,dev:devView,ausw:auswView,archiv:archView,notizen:notesView,markiert:markView,suche:suchView,karten:kartView,regeln:regelView,ablauf:ablaufView,methoden:methView,info:infoView,ruhe:ruheView,stats:statsView,data:dataView,result:resultView})[v]();
   }catch(e){h=`<div class="card"><b>Fehler beim Anzeigen</b><p class="sub">${H(e.message)}</p><button class="btn" data-a="tab" data-v="home">Zur Startseite</button></div>`;console.error(e);}
   app.innerHTML=`<main class="wrap">${h}</main>${nav()}`;
   refreshAcct();plRender();
@@ -534,7 +534,7 @@ function ivView(){
   return head('Psychologisches Gespräch',`${done} von ${IV.length} geübt. Laut antworten, 1–2 Minuten pro Frage.`,'Lernen')+IV.map((x,i)=>{const g=x[0]!==last?`<div class="sec">${H(x[0])}</div>`:'';last=x[0];
     return g+`<div class="card ivc ${ST.iv[i]?'done':''}"><b class="ivq">${H(x[1])}</b>
     <details><summary>Tipp anzeigen</summary><p class="sub">${H(x[2])}</p></details>
-    ${AI&&ST.ki?`<details class="kid"><summary>Meine Antwort von der KI prüfen lassen</summary><textarea class="in ta" id="iva${i}" rows="4" placeholder="Schreib deine Antwort in Stichworten oder ganz …"></textarea><button class="btn sm" data-a="ivai" data-i="${i}">Feedback holen</button><div class="aiout" id="ivo${i}" aria-live="polite"></div></details>`:''}
+    ${kiOn()?`<details class="kid"><summary>Meine Antwort von der KI prüfen lassen</summary><textarea class="in ta" id="iva${i}" rows="4" placeholder="Schreib deine Antwort in Stichworten oder ganz …"></textarea><button class="btn sm" data-a="ivai" data-i="${i}">Feedback holen</button><div class="aiout" id="ivo${i}" aria-live="polite"></div></details>`:''}
     <div class="row"><button class="pill" data-a="say" data-t="${H(x[1])}">${ICO(I.spk,18)} Vorlesen</button><button class="pill ${ST.iv[i]?'on':''}" data-a="ivdone" data-i="${i}">${ICO(I.check,18)} ${ST.iv[i]?'Geübt':'Als geübt markieren'}</button></div></div>`;}).join('');
 }
 let DK={i:0,res:null};
@@ -602,9 +602,15 @@ function meView(){
     ${voices}${cv}
     <div class="frow"><div><b>Vorlese-Tempo</b><small id="rtv">${String(ST.tts.rate).replace('.',',')}×${eng==='auto'?' (Claude-Stimme: 0,7–1,5×)':''}</small></div><input type="range" min="0.5" max="2" step="0.1" value="${ST.tts.rate}" class="range" data-a="rate" aria-label="Vorlese-Tempo"></div>
     <div class="frow"><div><b>Mitlesen markieren</b><small>Aktueller Satz wird hervorgehoben</small></div>${sw('tts.hl',ST.tts.hl)}</div>
-    <div class="frow"><div><b>KI-Coach</b><small>${AI?'Erklärt Fehler, beantwortet Fragen':'In diesem Fenster nicht verfügbar'}</small></div>${sw('ki',ST.ki)}</div>
+    <div class="frow"><div><b>KI-Coach</b><small>${AI?'Eingebaut (Claude)':ST.gkey?'Mit deinem Gemini-Schlüssel':'Braucht einen kostenlosen Gemini-Schlüssel'}</small></div>${sw('ki',ST.ki)}</div>
+    ${AI?'':`<div class="frow"><div><b>Gemini-Schlüssel</b><small>Kostenlos bei <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. Bleibt nur auf diesem Gerät, wird nicht gesichert.</small></div><input class="in" id="gkey" type="password" autocomplete="off" placeholder="AIza…" value="${H(ST.gkey)}"></div>`}
+    <div class="frow"><div><b>„Wie sicher bist du?“ fragen</b><small>Zeigt dir, wo du dich überschätzt</small></div>${sw('conf',ST.conf)}</div>
     <div class="frow"><div><b>Fragen pro Runde</b><small>Bei Themen und Wissen-Quiz</small></div><div class="seg sm">${[['alle','Alle'],['20','20'],['10','10']].map(([v,l])=>`<button class="${ST.round===v?'on':''}" data-a="set" data-k="round" data-v="${v}">${l}</button>`).join('')}</div></div>
    </div>
+   <div class="sec">Mehr</div>
+   <div class="list">${row('ausw','Auswertung','Wochenbericht, schwache Themen, Muster','#0A5FC8',I.learn)}${row('archiv','Ergebnis-Archiv',ST.arch.length+' Runden mit allen Antworten','#5B3FD6',I.list)}${row('notizen','Notizen',Object.keys(ST.notes).length+' Notizen, durchsuchbar','#E5A000',I.note)}${row('markiert','Markierte Fragen',Object.keys(ST.mk).length+' mit Stern','#FF9500','<path d="M12 3l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.8 6.2 20.9l1.1-6.5L2.6 9.8l6.5-.9z"/>')}${row('suche','Fragen suchen','Alle festen Fragen und Erklärungen','#6C6C70','<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/>')}${row('karten','Lernkarten','Österreich, Steiermark, Polizei, Aufnahmeverfahren','#2FA45A',I.know)}${row('regeln','Regel-Karten',Object.keys(ST.rk).length+' Regeln aus deinen Fehlern','#C4161C',I.warn)}</div>
+   <div class="list">${row('ablauf','Ablauf und Fristen','Bewerbung, Testtage, Bewertung, Checklisten','#0A3D8F',I.list)}${row('ruhe','Ruhig in den Test','Sorgen aufschreiben, Atmen, Testtag-Plan','#30B0C7','<path d="M3 12h4l3-8 4 16 3-8h4"/>')}${row('methoden','Wie die App lernt','Lernforschung hinter den Funktionen','#8E8E93',I.spark)}${row('info','Hinweise und Quellen','Was die App ist und was nicht','#8E8E93','<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/>')}</div>
+   <div class="card"><div class="ch"><b>Lern-Erinnerung</b></div><p class="sub">Legt eine tägliche Erinnerung für 60 Tage in deinem Kalender an. Am iPhone die Datei öffnen und „Alle hinzufügen“ tippen.</p><div class="inrow"><input class="in" type="time" id="remt" value="${H(ST.rem)}" aria-label="Uhrzeit"><button class="btn sm" data-a="ics">Kalender-Datei</button></div>${IS_LINK?'<p class="fine left">Im Claude-Link sind Downloads gesperrt, auf der Website geht es.</p>':''}</div>
    <div class="list">${row('data','Sichern und übertragen','Code kopieren, auf anderem Gerät einfügen','#6C6C70',I.cloud)}${isDev()?row('dev','Entwickler','Server-Zahlen, Test-Werkzeuge, Rohdaten','#111114',I.spark):''}</div>
    <button class="btn ghost danger" data-a="reset">Alle Daten auf diesem Gerät löschen</button>
    <p class="fine left">Inoffizielle Übungs-App mit selbst geschriebenen und erzeugten Aufgaben. Nicht vom Innenministerium oder der Polizei. Kein Abo, keine Werbung.</p>`;
@@ -649,11 +655,106 @@ function dataView(){
    <div class="card"><div class="ch"><b>2. Code einfügen</b></div><textarea class="in ta mono" id="imcode" rows="4" placeholder="Code hier einfügen …"></textarea><button class="btn sm alt" data-a="import">Übernehmen</button><p class="fine left">Ersetzt den Stand auf diesem Gerät.</p></div>`;
 }
 
+
+/* ================= Mehr: Auswertung, Archiv, Notizen, Markiert, Suche, Lernkarten, Regel-Karten, Ablauf, Methoden, Ruhe, Hinweise ================= */
+const pc=x=>Math.round(100*x);
+const accA=a=>a.length?a.reduce((t,e)=>t+e.o,0)/a.length:null;
+const med=a=>{if(!a.length)return 0;const b=a.slice().sort((x,y)=>x-y);return b[Math.floor(b.length/2)];};
+function weakTags(){const L=ST.log.filter(e=>e.g).slice(-800),g={};for(const e of L){const k=e.a+'|'+e.g;const x=g[k]||(g[k]={a:e.a,c:e.c,g:e.g,n:0,w:0});x.n++;if(!e.o)x.w++;}
+  return Object.values(g).filter(x=>x.w>=2&&x.w/x.n>=.25).sort((a,b)=>(b.w*b.w/b.n)-(a.w*a.w/a.n)).slice(0,6);}
+function auswView(){
+  const now=Date.now(),L=ST.log,a7=L.filter(e=>e.t>=now-7*DMS),p7=L.filter(e=>e.t<now-7*DMS&&e.t>=now-14*DMS);
+  const pat=[];
+  if(a7.length>=10&&p7.length>=10){const d=Math.round(100*(accA(a7)-accA(p7)));pat.push([d>=0?'Trend: besser':'Trend: schlechter',`Letzte 7 Tage ${pc(accA(a7))} % richtig, die 7 Tage davor ${pc(accA(p7))} % (${d>=0?'+':''}${d} Prozentpunkte).`,d<0]);}
+  else pat.push(['Trend','Noch zu wenig Daten für den Wochenvergleich (je mindestens 10 Antworten).',0,1]);
+  const W=L.filter(e=>!e.o&&e.d>800&&e.d<600000).map(e=>e.d),R=L.filter(e=>e.o&&e.d>800&&e.d<600000).map(e=>e.d);
+  if(W.length>=8&&R.length>=8){const mw=med(W),mr=med(R),f=x=>Math.round(x/1000)+' s';
+    pat.push(mw<mr*.6?['Zu schnell bei Fehlern',`Falsche Antworten gibst du im Mittel nach ${f(mw)}, richtige nach ${f(mr)}. Viele Fehler sind wohl Flüchtigkeitsfehler: Aufgabe ganz lesen, dann antworten.`,1]:mw>mr*1.6?['Viel Zeit bei schweren Aufgaben',`Falsch: ${f(mw)}, richtig: ${f(mr)}. Im Test gilt: Nach etwa einer Minute eine Wahl treffen und weitermachen.`,1]:['Tempo passt',`Richtig im Mittel ${f(mr)}, falsch ${f(mw)}. Kein auffälliges Muster.`,0]);}
+  else pat.push(['Tempo','Noch zu wenig Daten (je 8 richtige und falsche Antworten).',0,1]);
+  const C=L.filter(e=>e.f===2),G=L.filter(e=>e.f===0);
+  if(C.length>=8){const w=C.filter(e=>!e.o).length/C.length;pat.push(w>=.2?['Du überschätzt dich',`Bei „Sicher“ ist ${pc(w)} % falsch. Prüfe sichere Antworten noch einmal kurz.`,1]:['Gute Selbsteinschätzung',`Bei „Sicher“ ist nur ${pc(w)} % falsch.`,0]);
+    if(G.length>=5&&accA(G)>=.5)pat.push(['Du unterschätzt dich',`Geratene Antworten sind zu ${pc(accA(G))} % richtig. Du weißt mehr, als du denkst.`,0]);}
+  else pat.push(['Selbsteinschätzung','Noch zu wenig Daten. Beantworte mindestens 8 Aufgaben mit „Sicher“.',0,1]);
+  const slot=h=>h<12?'Vormittag':h<17?'Nachmittag':'Abend';const by={};L.forEach(e=>{const k=slot(new Date(e.t).getHours());(by[k]=by[k]||[]).push(e);});
+  const sl=Object.entries(by).filter(([,v])=>v.length>=15).map(([k,v])=>[k,accA(v)]).sort((x,y)=>y[1]-x[1]);
+  if(sl.length>=2)pat.push(['Beste Tageszeit',`${sl[0][0]}: ${pc(sl[0][1])} % richtig, ${sl[sl.length-1][0]}: ${pc(sl[sl.length-1][1])} %. Lerne Schweres möglichst am ${sl[0][0]}.`,0]);
+  const wk=weakTags();
+  const wb=AREAS.map(a=>{const x=a7.filter(e=>e.a===a.id),y=p7.filter(e=>e.a===a.id);return `<tr><td>${SHORT[a.id]}</td><td>${x.length}</td><td>${x.length?pc(accA(x))+' %':'–'}</td><td>${x.length&&y.length?((accA(x)>=accA(y)?'+':'')+Math.round(100*(accA(x)-accA(y)))):'–'}</td></tr>`;}).join('');
+  return head('Auswertung','Wochenbericht, schwache Themen und deine Muster. Wird mit jeder Antwort genauer.','Profil')+`
+   <div class="sec">Diese Woche</div><div class="card"><table class="tb st"><tr><th>Bereich</th><th>Antw.</th><th>Quote</th><th>± Vorwoche</th></tr>${wb}</table></div>
+   <div class="sec">Schwache Themen</div>${wk.length?`<div class="list">${wk.map((x,i)=>`<button class="li" data-a="weak" data-i="${i}"><span class="ic" style="background:${(AREA_COL[x.a]||['#eee'])[0]};color:${(AREA_COL[x.a]||[0,'#333'])[1]}">${ICO(AREA_IC[x.a]||I.warn,18)}</span><span class="tx"><b>${H(x.g)}</b><span class="s">${x.w} von ${x.n} falsch · gezielt üben</span></span>${ICO(I.chev,18)}</button>`).join('')}</div>`:'<p class="sub pad">Noch keine auffälligen Schwächen (ab 2 Fehlern und 25 % Fehlerquote je Thema).</p>'}
+   <div class="sec">Deine Muster</div>${pat.map(([t,d,bad,nd])=>`<div class="card pat ${bad?'bad':''} ${nd?'nd':''}"><b>${H(t)}</b><p class="sub">${H(d)}</p></div>`).join('')}`;
+}
+function weakItems(x){
+  const bank=Object.values(BANKBY).flat().filter(q=>(q.tag||'')===x.g);
+  if(bank.length)return mix(bank).slice(0,15).map(q=>Q(q));
+  if(GEN[x.c]){const out=[];for(let k=0;k<60&&out.length<12;k++){try{const q=GEN[x.c](lvOf(x.c));if(tagOf(q)===x.g)out.push(Q(q));}catch(e){}}if(out.length)return out;return genPick(x.c,10).map(q=>Q(q));}
+  return areaItems(x.a);
+}
+function archView(){
+  if(V.arg!=null&&ST.arch[V.arg]){const r=ST.arch[V.arg];return head(r.title,`${new Date(r.t).toLocaleString('de-AT',{dateStyle:'medium',timeStyle:'short'})} · ${r.ok}/${r.n} richtig · ${mmss(r.dur/1000)}`,'Archiv')+`<div class="card">${r.R.map(x=>`<div class="arw ${x.ok?'ok':'bad'}"><span class="rd">${x.ok?'✓':'✕'}</span><div><p class="pre">${H(x.q)}</p><small>Deine Antwort: ${H(x.g)}${x.ok?'':' · Richtig: '+H(x.r)}</small></div></div>`).join('')}</div>`;}
+  return head('Ergebnis-Archiv',`${ST.arch.length} gespeicherte Runden (die letzten 40).`,'Profil')+(ST.arch.length?`<div class="list">${ST.arch.map((r,i)=>`<button class="li" data-a="go" data-v="archiv" data-x="${i}"><span class="tx"><b>${H(r.title)}</b><span class="s">${new Date(r.t).toLocaleString('de-AT',{dateStyle:'short',timeStyle:'short'})} · ${r.n} Aufgaben</span></span><span class="val">${Math.round(100*r.ok/r.n)} %</span>${ICO(I.chev,18)}</button>`).join('')}</div>`:'<p class="sub pad">Noch keine Runde abgeschlossen.</p>');
+}
+let NF='';
+function notesView(){
+  const all=Object.entries(ST.notes).map(([k,v])=>typeof v==='string'?[k,{t:v,q:'',ts:0}]:[k,v]).sort((a,b)=>(b[1].ts||0)-(a[1].ts||0));
+  const f=NF.toLowerCase(),L=f?all.filter(([,v])=>(v.t+' '+v.q).toLowerCase().includes(f)):all;
+  return head('Notizen',`${all.length} Notizen zu Aufgaben.`,'Profil')+`<input class="in" id="nsearch" placeholder="Notizen durchsuchen …" value="${H(NF)}">`+(L.length?L.map(([k,v])=>`<div class="card"><p class="pre sub">${H(v.q||'')}</p>${v.a?`<p class="fine left">Richtig: ${H(v.a)}</p>`:''}<p class="pre"><b>${H(v.t)}</b></p><div class="row">${v.id&&QBYID[v.id]?`<button class="pill" data-a="qone" data-x="${H(v.id)}">Nochmal üben</button>`:''}<button class="pill" data-a="ndel" data-x="${H(k)}">Löschen</button></div></div>`).join(''):'<p class="sub pad">Keine Notizen. Nach jeder Antwort kannst du unter „Notiz“ etwas festhalten.</p>');
+}
+function markView(){
+  const ids=Object.keys(ST.mk).filter(id=>QBYID[id]);
+  return head('Markierte Fragen',`${ids.length} mit Stern markiert.`,'Profil')+(ids.length?`<button class="btn" data-a="mkrun">Alle ${ids.length} üben</button><div class="card">${ids.map(id=>`<div class="arw"><div><p class="pre">${H(QBYID[id].q)}</p><small>${H(CAT[QBYID[id].cat]?CAT[QBYID[id].cat].t:'')}</small></div><button class="pill" data-a="unmk" data-x="${H(id)}">Entfernen</button></div>`).join('')}</div>`:'<p class="sub pad">Noch nichts markiert. Tippe bei einer Frage auf den Stern.</p>');
+}
+let SQ='';
+function suchView(){
+  const f=SQ.trim().toLowerCase();let res=[];
+  if(f.length>=3)res=Object.values(QBYID).filter(q=>(String(q.q)+' '+(q.e||'')+' '+(q.tag||'')).toLowerCase().includes(f)).slice(0,40);
+  return head('Fragen suchen','Durchsucht alle festen Fragen, Texte und Erklärungen.','Profil')+`<input class="in" id="qsearch" placeholder="Suchbegriff, z. B. Dativ, Prozent, StVO …" value="${H(SQ)}" autocapitalize="off">`+
+   (f.length<3?'<p class="sub pad">Mindestens 3 Zeichen eingeben.</p>':res.length?`<p class="sub pad">${res.length}${res.length===40?'+':''} Treffer</p><button class="btn alt" data-a="sqrun">Diese Fragen üben</button>${res.map(q=>`<details class="card"><summary class="pre">${H(String(q.q).slice(0,160))}</summary><p><small>Richtig:</small> ${H(q.t==='mc'?q.c:q.t==='num'?fmt(q.ans):(q.ans||[])[0])}</p>${q.e?`<p class="sub">${H(q.e)}</p>`:''}</details>`).join('')}`:'<p class="sub pad">Keine Treffer.</p>');
+}
+const DECKS={at:'Österreich',st:'Steiermark',po:'Polizei, Recht, Verkehr',av:'Aufnahmeverfahren 2026'};
+let K=null;
+function kartView(){
+  if(!K)return head('Lernkarten','Vorderseite lesen, Antwort im Kopf geben, umdrehen und ehrlich einschätzen. Nicht Gewusstes kommt früher wieder.','Profil')+`<div class="list">${Object.entries(DECKS).map(([k,t])=>{const ids=(BANKBY[k]||[]).map(q=>q.id);return `<button class="li" data-a="deck" data-x="${k}"><span class="ic" style="background:var(--tint);color:#fff">${ICO(I.know,18)}</span><span class="tx"><b>${t}</b><span class="s">${ids.length} Karten · ${sureCount(ids)} sicher</span></span>${ICO(I.chev,18)}</button>`;}).join('')}</div>`;
+  if(K.i>=K.list.length)return head(DECKS[K.d],null,'Lernkarten')+`<div class="res"><div class="bigp">${K.ok}/${K.list.length}</div><p class="lead">gewusst</p></div><button class="btn" data-a="deck" data-x="${K.d}">Weitere 20 Karten</button><button class="btn ghost" data-a="kend">Andere Kartei</button>`;
+  const q=K.list[K.i],ans=q.t==='mc'?q.c:q.t==='num'?fmt(q.ans):(q.ans||[])[0];
+  return `<button class="back" data-a="kend">${ICO(I.back,20)}<span>Lernkarten</span></button><div class="studt"><span class="track"><i style="width:${Math.round(100*K.i/K.list.length)}%"></i></span><b>${K.i+1}/${K.list.length}</b></div>
+   <button class="fcard ${K.flip?'on':''}" data-a="flip"><span class="fin"><span class="ff"><small>${H(q.tag||DECKS[K.d])}</small><span class="fq">${H(q.q)}</span><span class="fine">Tippen zum Umdrehen</span></span><span class="fb2"><small>Antwort</small><span class="fa">${H(ans)}</span>${q.e?`<span class="fe">${H(q.e)}</span>`:''}</span></span></button>
+   ${K.flip?`<div class="row"><button class="btn alt wide" data-a="kr" data-v="0">Nicht gewusst</button><button class="btn wide" data-a="kr" data-v="1">Gewusst</button></div>`:''}`;
+}
+let RK={f:'all',i:0,show:false};
+function regelView(){
+  const keys=Object.keys(ST.rk).filter(k=>RK.f==='all'||ST.rk[k].ar===RK.f).sort((a,b)=>ST.rk[b].n-ST.rk[a].n||ST.rk[b].t-ST.rk[a].t);
+  let h=head('Regel-Karten','Nach jedem Fehler in Logik oder Sprache landet die passende Regel hier. Blättere sie vor dem Test durch. Was sitzt, nimmst du heraus.','Profil')+`<div class="seg">${[['all','Alle'],['logik','Logik'],['sprache','Sprache']].map(([k,l])=>`<button class="${RK.f===k?'on':''}" data-a="rkf" data-v="${k}">${l}</button>`).join('')}</div>`;
+  if(!keys.length)return h+'<p class="sub pad">Noch keine Regel-Karten. Sie entstehen automatisch bei Fehlern.</p>';
+  const k=keys[RK.i%keys.length],x=ST.rk[k];
+  return h+`<div class="card"><div class="ch"><span class="chip" style="background:var(--fill)">${H(x.tg)}</span><span class="sub">${RK.i%keys.length+1}/${keys.length}${x.n>1?' · '+x.n+'× falsch':''}</span></div><p class="pre"><b>${H(x.q)}</b></p>
+   ${RK.show?`<div class="ra"><small>Richtig</small><div>${H(x.a)}</div></div>${x.e?`<p class="exp">${H(x.e)}</p>`:''}<div class="row"><button class="btn sm alt" data-a="rkdel" data-x="${H(k)}">Sitzt, herausnehmen</button><button class="btn sm" data-a="rknext">Nächste Karte</button></div>`:`<div class="row"><button class="btn sm" data-a="rkshow">Regel zeigen</button><button class="btn sm alt" data-a="rknext">Weiter</button></div>`}</div>`;
+}
+function ablaufView(){const box=(k,t)=>`<button class="cbrow ${ST.chk[k]?'on':''}" data-a="chk" data-x="${H(k)}" role="checkbox" aria-checked="${!!ST.chk[k]}"><span class="cbk">${ST.chk[k]?'✓':''}</span><span>${H(t)}</span></button>`;
+  return head('Ablauf und Fristen',null,'Profil')+'<div class="legacy">'+ABLAUF_HTML.replace('%%CHKV%%',CHK_VOR.map(([k,t])=>box('v_'+k,t)).join('')).replace('%%CHKT%%',CHK_T2.map(([k,t])=>box('t_'+k,t)).join(''))+'</div>';}
+function methView(){return head('Wie die App lernt','Jede Funktion beruht auf Lernforschung.','Profil')+METHODS.map(m=>`<div class="card"><b>${H(m[0])}</b><p class="sub">${H(m[1])}</p><p class="fine left">${H(m[2])}${m[3]&&/^https:\/\//.test(m[3])?` · <a href="${H(m[3])}" target="_blank" rel="noopener">Quelle</a>`:''}</p></div>`).join('');}
+function infoView(){return head('Hinweise und Quellen',null,'Profil')+'<div class="legacy">'+INFO_HTML+'</div>';}
+let RU={w:null,b:null};
+function ruheView(){
+  return head('Ruhig in den Test','Vier kurze Werkzeuge für die Tage vor dem Test und den Testmorgen. Alles bleibt auf deinem Gerät.','Profil')+`
+   <div class="sec">1 · Sorgen aufschreiben (10 Minuten)</div><div class="card"><p class="sub">Schreib direkt vor dem Üben oder am Testmorgen ehrlich auf, was dich beunruhigt. Sehr nervösen Schülern half das in einer Studie (Ramirez &amp; Beilock 2011, Science).</p><textarea class="in ta" id="rutxt" rows="6" placeholder="Was mich am Test beunruhigt …">${H(ST.ruhe||'')}</textarea><div class="row"><button class="btn sm" data-a="ru-w">${RU.w?'Stopp':'10-Minuten-Uhr starten'}</button><button class="btn sm ghost" data-a="ru-del">Text löschen</button></div><p class="sub" id="rutime" role="timer">${RU.w?'':'Nicht schön schreiben, nur ehrlich.'}</p></div>
+   <div class="sec">2 · Langsam atmen (2 Minuten)</div><div class="card"><p class="sub">4 Sekunden ein, 6 Sekunden aus. Langsames Ausatmen beruhigt den Puls.</p><div class="brw"><div class="brc" id="brc">${RU.b?'':'Bereit'}</div><p class="sub" id="brl" aria-live="polite">${RU.b?'':'12 Atemzüge'}</p><button class="btn sm" data-a="ru-b">${RU.b?'Stopp':'Atmen starten'}</button></div></div>
+   <div class="sec">3 · Aufregung umdeuten</div><div class="card"><p class="sub">Herzklopfen ist Energie für Leistung, kein Zeichen von Versagen. Sag dir vor dem Start: <b>„Ich bin aufgeregt, weil es mir wichtig ist. Mein Körper macht mich bereit.“</b></p></div>
+   <div class="sec">4 · Testtag-Plan</div><div class="card"><ul class="lx"><li>Am Vorabend kein neuer Stoff, nur kurz wiederholen. Ausreichend schlafen.</li><li>Ausweis, Einladung und Lebenslauf (für Testtag 2) einpacken, Anfahrt mit Puffer planen.</li><li>Frühstücken und Wasser trinken. Der Computertest dauert etwa 2–3 Stunden.</li><li>Erklärungen und Übungsaufgaben vor jeder Aufgabengruppe in Ruhe lesen.</li><li>Bei einer schweren Aufgabe nicht hängen bleiben. Im Persönlichkeitsteil ehrlich und gleichbleibend antworten.</li></ul><p class="fine left">Ablauf laut polizeikarriere.gv.at, Stand November 2026. Maßgeblich ist deine Einladung.</p></div>`;
+}
+function ruStop(){if(RU.w){clearInterval(RU.w.iv);RU.w=null;}if(RU.b){clearTimeout(RU.b.to);RU.b=null;}}
+function icsFile(){
+  const [hh,mm]=(ST.rem||'18:00').split(':').map(Number);const d=new Date();d.setDate(d.getDate()+1);
+  const p=n=>String(n).padStart(2,'0');const ds=`${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}T${p(hh)}${p(mm)}00`;
+  const url=location.href.split('#')[0];
+  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Aufnahmetest Trainer//DE','BEGIN:VEVENT','UID:atn-'+Date.now()+'@aufnahmetest','DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z','DTSTART:'+ds,'DURATION:PT20M','RRULE:FREQ=DAILY;COUNT=60','SUMMARY:Aufnahmetest üben (20 Min.)','DESCRIPTION:Tagesplan im Aufnahmetest Trainer: '+url,'BEGIN:VALARM','TRIGGER:PT0M','ACTION:DISPLAY','DESCRIPTION:Zeit zum Üben','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
+}
 /* ================= Runde (Session) ================= */
 function start(title,items,mode,meta){
   items=items.filter(Boolean);if(!items.length){toast('Gerade keine Aufgaben verfügbar.');return;}
   stopSpeak();
-  S={title,items,i:0,mode:mode||'learn',meta:meta||{},res:[],ans:false,given:null,t0:Date.now(),end:mode==='exam'?Date.now()+EXAM_MIN*60000:0,zoom:false};
+  S={qt:Date.now(),sel:null,title,items,i:0,mode:mode||'learn',meta:meta||{},res:[],ans:false,given:null,t0:Date.now(),end:mode==='exam'?Date.now()+EXAM_MIN*60000:0,zoom:false};
   const it=S.items[0];if(it.k==='scene'||it.k==='memo')S.stud=Date.now()+(it.k==='scene'?it.sc.secs:it.m.secs)*1000;
   render();window.scrollTo(0,0);startTick();
 }
@@ -689,9 +790,10 @@ function sessView(){
   let opts='';
   if(q.t==='mc'){
     opts=`<div class="opts ${q.oh?'oh':''}">${q.o.map((o,i)=>{let c='';if(a&&!ex){if(i===q.ci)c='ok';else if(i===S.given)c='bad';}else if(a&&i===S.given)c='sel';
+      if(!a&&S.sel===i)c='sel';
       return `<button class="opt ${c}" data-a="pick" data-i="${i}" ${a?'disabled':''}><span class="lab">${'ABCDEF'[i]}</span><span class="ot">${q.oh?o:H(o)}</span>${c==='ok'?'<span class="mk">✓</span>':c==='bad'?'<span class="mk">✕</span>':''}</button>`;}).join('')}</div>`;
   }else{
-    opts=`<form class="inrow" data-a="numform"><input id="ans" class="in big ${a&&!ex?(S.okk?'ok':'bad'):''}" ${q.t==='num'?'inputmode="decimal"':'autocapitalize="off" spellcheck="false"'} autocomplete="off" placeholder="Antwort" value="${a?H(S.given):''}" ${a?'disabled':''} aria-label="Antwort">${a?'':'<button class="btn" type="submit">Prüfen</button>'}</form>`;
+    opts=`<form class="inrow" data-a="numform"><input id="ans" class="in big ${a&&!ex?(S.okk?'ok':'bad'):''}" ${q.t==='num'?'inputmode="decimal"':'autocapitalize="off" spellcheck="false"'} autocomplete="off" placeholder="Antwort" value="${a?H(S.given):''}" ${a?'disabled':''} aria-label="Antwort">${a?'':(useConf()?'':'<button class="btn" type="submit">Prüfen</button>')}</form>${!a&&useConf()?confRow():''}`;
   }
   const passage=it.p?`<details class="card psum"><summary>Text nochmal anzeigen</summary><div class="ptx">${H(it.p.text)}</div></details>`:'';
   return `<div class="sw2">${sessHead()}
@@ -700,7 +802,8 @@ function sessView(){
    ${qText(q)}
    ${opts}
    ${a&&!ex?feedback(it):''}
-   <div class="qfoot">${a?'':`<button class="rbtn" data-a="sayq" aria-label="Frage vorlesen">${ICO(I.spk,20)}</button>`}${a?`<button class="btn dark wide" data-a="next">${S.i>=S.items.length-1?'Auswertung':'Weiter'}</button>`:(q.t==='mc'?'<span class="fine">Tippe auf eine Antwort</span>':'')}</div></div>`;
+   ${!a&&q.t==='mc'&&useConf()&&S.sel!=null?confRow():''}
+   <div class="qfoot">${q.id&&QBYID[q.id]?`<button class="rbtn ${ST.mk[q.id]?'star':''}" data-a="star" aria-label="${ST.mk[q.id]?'Markierung entfernen':'Frage markieren'}" aria-pressed="${!!ST.mk[q.id]}">${ICO('<path d="M12 3l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.8 6.2 20.9l1.1-6.5L2.6 9.8l6.5-.9z"/>',20)}</button>`:''}${a?'':`<button class="rbtn" data-a="sayq" aria-label="Frage vorlesen">${ICO(I.spk,20)}</button>`}${a?`<button class="btn dark wide" data-a="next">${S.i>=S.items.length-1?'Auswertung':'Weiter'}</button>`:(q.t==='mc'&&!(useConf()&&S.sel!=null)?'<span class="fine">'+(useConf()?'Antwort wählen, dann sagen wie sicher':'Tippe auf eine Antwort')+'</span>':'')}</div></div>`;
 }
 function qText(q){
   const t=String(q.q);
@@ -710,15 +813,15 @@ function qText(q){
 function rightAns(q){if(q.t==='mc')return q.oh?q.o[q.ci]:H(q.o[q.ci]);if(q.t==='num')return H(fmt(q.ans));return H((q.ans||[])[0]);}
 function feedback(it){
   const q=it.q;let mark='';try{if(q.mk)mark=markHtml(q,S.given);}catch(e){}
-  const nid=q.id||('h'+hashS(q.q));const note=ST.notes[nid]||'';
+  const nid=q.id||('h'+hashS(q.q));const nn=ST.notes[nid];const note=nn?(typeof nn==='string'?nn:nn.t):'';
   const link=q.nurl&&/^https:\/\//.test(q.nurl)?` · <a href="${H(q.nurl)}" target="_blank" rel="noopener">im RIS</a>`:'';
   return `<div class="fb ${S.okk?'ok':'bad'}" tabindex="-1" id="fb"><b class="vd">${S.okk?ICO(I.check,20)+' Richtig':ICO(I.x,20)+' Leider falsch'}</b>
    ${S.okk?'':`<div class="ra"><small>Richtige Antwort</small><div>${rightAns(q)}</div></div>`}
    ${q.e?`<p class="exp">${H(q.e)}</p>`:''}${mark?`<div class="mark">${mark}</div>`:''}${q.norm?`<p class="fine left"><b>Rechtsgrundlage:</b> ${H(q.norm)}${link}</p>`:''}
    ${q.id&&!S.okk?'<p class="fine left">Diese Frage kommt bald wieder. Richtig beantwortet, dann nach 1, 3, 7, 14 und 30 Tagen.</p>':q.id?`<p class="fine left">Nächste Wiederholung in ${BOXD[(ST.qs[q.id]||{b:1}).b]||1} ${BOXD[(ST.qs[q.id]||{b:1}).b]===1?'Tag':'Tagen'}.</p>`:''}</div>
    <details class="acc" ${S.kiOpen?'open':''}><summary>${ICO(I.spark,18)}<span>KI-Coach fragen</span><i class="arr">${ICO(I.chev,16)}</i></summary><div class="accb">
-    ${AI&&ST.ki?`<div class="qk"><button class="pill" data-a="ki" data-v="einfach">Einfacher erklären</button><button class="pill" data-a="ki" data-v="merk">Merksatz</button><button class="pill" data-a="ki" data-v="aehnlich">Ähnliche Aufgabe</button></div>
-     <div class="inrow"><input class="in" id="kiin" placeholder="Eigene Frage zur Aufgabe …"><button class="btn sm" data-a="ki" data-v="frei">Fragen</button></div><div class="aiout" id="kiout" aria-live="polite"></div>`:`<p class="sub">${ST.ki?'Der eingebaute KI-Coach ist nur im Claude-Link verfügbar.':'KI-Coach ist im Profil ausgeschaltet.'}</p>`}
+    ${kiOn()?`<div class="qk"><button class="pill" data-a="ki" data-v="einfach">Einfacher erklären</button><button class="pill" data-a="ki" data-v="merk">Merksatz</button><button class="pill" data-a="ki" data-v="aehnlich">Ähnliche Aufgabe</button></div>
+     <div class="inrow"><input class="in" id="kiin" placeholder="Eigene Frage zur Aufgabe …"><button class="btn sm" data-a="ki" data-v="frei">Fragen</button></div><div class="aiout" id="kiout" aria-live="polite"></div>`:`<p class="sub">${ST.ki?'Für den KI-Coach im Profil einen kostenlosen Gemini-Schlüssel eintragen.':'KI-Coach ist im Profil ausgeschaltet.'}</p>`}
     <div class="row"><button class="pill" data-a="extai" data-v="chatgpt">In ChatGPT öffnen</button><button class="pill" data-a="extai" data-v="claude">In Claude öffnen</button></div></div></details>
    <details class="acc"><summary>${ICO(I.note,18)}<span>Notiz${note?' (1)':''}</span><i class="arr">${ICO(I.chev,16)}</i></summary><div class="accb"><textarea class="in ta" id="note" data-nid="${H(nid)}" rows="3" placeholder="Was will ich mir merken?">${H(note)}</textarea></div></details>`;
 }
@@ -732,8 +835,10 @@ function isOk(q,g){
   if(q.t==='text')return (q.ans||[]).some(a=>nrm(a)===nrm(g));
   return false;
 }
-function answer(g){
-  if(!S||S.ans)return;const it=S.items[S.i],q=it.q;
+const useConf=()=>ST.conf&&S&&S.mode!=='exam';
+function confRow(){return `<div class="conf"><span class="fine left">Wie sicher bist du?</span><div class="confb"><button class="btn sm" data-a="conf" data-f="2">Sicher</button><button class="btn sm alt" data-a="conf" data-f="1">Eher sicher</button><button class="btn sm alt" data-a="conf" data-f="0">Geraten</button></div></div>`;}
+function answer(g,f){
+  if(!S||S.ans)return;S.f=f;const it=S.items[S.i],q=it.q;
   if(q.t!=='mc'&&String(g).trim()===''){toast('Bitte zuerst eine Antwort eingeben.');return;}
   const ok=isOk(q,g);S.ans=true;S.given=g;S.okk=ok;S.kiOpen=false;
   S.res.push({q,ok,g,sc:it.sc,p:it.p&&it.p.id});
@@ -741,10 +846,16 @@ function answer(g){
   try{navigator.vibrate&&navigator.vibrate(ok?15:[30,40,30]);}catch(e){}
   if(S.mode==='exam'){nextItem();return;}
   render();
-  const f=document.getElementById('fb');if(f){f.focus({preventScroll:true});f.scrollIntoView({behavior:'smooth',block:'nearest'});}
+  const fb=document.getElementById('fb');if(fb){fb.focus({preventScroll:true});fb.scrollIntoView({behavior:'smooth',block:'nearest'});}
 }
+const tagOf=q=>q.tg||q.tag||(typeof TIDN!=='undefined'&&TIDN[q.tid])||(CAT[q.cat]&&CAT[q.cat].t)||'';
+const plain=h=>String(h==null?'':h).replace(/<[^>]*>/g,'').trim()||'(Grafik)';
+function rightPlain(q){if(q.t==='mc')return q.oh?'Grafik '+'ABCDEF'[q.ci]:plain(q.o[q.ci]);if(q.t==='num')return fmt(q.ans);return (q.ans||[])[0];}
+function givenPlain(q,g){if(q.t==='mc')return g==null?'–':q.oh?'Grafik '+'ABCDEF'[g]:plain(q.o[g]);return String(g==null?'–':g);}
 function record(q,ok,it){
-  ST.log.push({t:Date.now(),a:q.area,c:q.cat,o:ok?1:0});if(ST.log.length>1500)ST.log.splice(0,ST.log.length-1500);
+  const e={t:Date.now(),a:q.area,c:q.cat,o:ok?1:0,g:tagOf(q).slice(0,40),m:S?S.mode:'',d:S&&S.qt?Date.now()-S.qt:0};if(S&&S.f!=null)e.f=S.f;if(q.id)e.i=q.id;
+  ST.log.push(e);
+  if(!ok&&(q.area==='logik'||q.area==='sprache')&&q.cat!=='sz'){const k=q.id||('h'+hashS(q.q));const r=ST.rk[k]||{n:0};Object.assign(r,{q:String(q.q).slice(0,400),a:rightPlain(q),e:q.e||'',tg:tagOf(q),ar:q.area,n:r.n+1,t:Date.now()});ST.rk[k]=r;const ks=Object.keys(ST.rk);if(ks.length>120){ks.sort((x,y)=>ST.rk[x].t-ST.rk[y].t).slice(0,ks.length-120).forEach(x=>delete ST.rk[x]);}}if(ST.log.length>1500)ST.log.splice(0,ST.log.length-1500);
   ST.days[dk()]=(ST.days[dk()]||0)+1;
   if(q.id&&QBYID[q.id]){const r=ST.qs[q.id]||{b:0,n:0,w:0};r.n++;if(ok){r.b=Math.min(5,r.b+1);r.due=Date.now()+BOXD[r.b]*DMS;}else{r.b=0;r.w++;r.due=Date.now()+DMS/2;}ST.qs[q.id]=r;}
   else if(!q.id&&q.cat!=='sz'){if(!ok){const c=Object.assign({},q);delete c.o;delete c.ci;delete c.area;ST.wg.unshift(c);ST.wg=ST.wg.slice(0,30);}else if(it&&it.wgi!=null){ST.wg=ST.wg.filter(x=>x!==it.wgref);}}
@@ -754,7 +865,7 @@ function record(q,ok,it){
 function nextItem(){
   stopSpeak();
   if(S.i>=S.items.length-1){finish();return;}
-  S.i++;S.ans=false;S.given=null;S.zoom=false;
+  S.i++;S.ans=false;S.given=null;S.zoom=false;S.sel=null;S.qt=Date.now();
   const it=S.items[S.i];
   if(it.k==='scene'||it.k==='memo')S.stud=Date.now()+(it.k==='scene'?it.sc.secs:it.m.secs)*1000;else S.stud=0;
   render();window.scrollTo(0,0);
@@ -767,6 +878,7 @@ function finish(){
   if(S.mode==='plan'&&S.meta.unit!=null){const P=plan();if(!P.done.includes(S.meta.unit))P.done.push(S.meta.unit);}
   if(S.mode==='einst'){ST.einst={t:Date.now(),ok,n};ST.plan=null;}
   if(S.mode==='exam')ST.ex.push({t:Date.now(),ok,n,p:Math.round(100*ok/n)});
+  if(R.length){ST.arch.unshift({t:Date.now(),title:S.title,mode:S.mode,ok,n:R.length,dur:Date.now()-S.t0,R:R.map(x=>({q:String(x.q.q).slice(0,220),ok:x.ok?1:0,g:givenPlain(x.q,x.g).slice(0,80),r:String(rightPlain(x.q)).slice(0,80),id:x.q.id||''}))});ST.arch=ST.arch.slice(0,40);}
   const scs=new Set(R.filter(r=>r.sc).map(r=>r.sc));scs.forEach(id=>{const sc=SCENES.find(s=>s.id===id);const k=R.filter(r=>r.sc===id&&r.ok).length;const o=ST.sc[id]||{best:0,n:0};o.best=Math.max(o.best,k);o.last=k;o.n++;ST.sc[id]=o;});
   const ps=new Set(R.filter(r=>r.p).map(r=>r.p));ps.forEach(id=>{ST.psg[id]={ok:R.filter(r=>r.p===id&&r.ok).length,t:Date.now()};});
   if(!ST.onb&&S.mode==='einst'){ST.onb=true;}
@@ -866,24 +978,31 @@ function plRender(){
 function partsOf(sel){return [...document.querySelectorAll(sel+' .sp')].sort((a,b)=>a.dataset.s-b.dataset.s).map(e=>e.textContent);}
 
 /* ================= KI ================= */
+async function llm(prompt,onText){
+  if(AI){const r=await AI(prompt,{modelTier:'quick',onText:({text})=>onText(text)});return r.text;}
+  if(ST.gkey){const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key='+encodeURIComponent(ST.gkey),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}]})});
+    const j=await r.json().catch(()=>({}));if(!r.ok)throw {code:r.status===429?'rate_limited':r.status===400||r.status===403?'key':'x'};
+    return ((j.candidates||[])[0]&&j.candidates[0].content.parts.map(x=>x.text).join(''))||'';}
+  throw {code:'none'};
+}
+const kiOn=()=>ST.ki&&(AI||ST.gkey);
 async function askKI(kind,q,outId,extra){
   const out=document.getElementById(outId);if(!out)return;
-  if(!AI){out.textContent='KI-Coach ist hier nicht verfügbar.';return;}
+  if(!kiOn()){out.textContent='KI-Coach ist nicht eingerichtet (Profil → KI-Coach).';return;}
   const ctx=`Aufgabe: ${q.q}\n${q.t==='mc'?'Antwortmöglichkeiten: '+(q.oh?'(Grafiken)':q.o.join(' | '))+'\n':''}Richtige Antwort: ${q.t==='mc'?(q.oh?'Grafik '+'ABCDEF'[q.ci]:q.o[q.ci]):q.t==='num'?fmt(q.ans):(q.ans||[])[0]}\n${S&&S.given!=null?'Antwort des Lernenden: '+(q.t==='mc'?(q.oh?'Grafik '+'ABCDEF'[S.given]:q.o[S.given]):S.given)+' ('+(S.okk?'richtig':'falsch')+')\n':''}Erklärung aus der App: ${q.e||'-'}`;
   const ask={einfach:'Erkläre die Lösung ganz einfach in 3–5 kurzen Sätzen, Schritt für Schritt.',merk:'Gib einen kurzen, einprägsamen Merksatz oder Trick für diesen Aufgabentyp (max. 3 Sätze).',aehnlich:'Erstelle EINE ähnliche Übungsaufgabe mit gleichem Schwierigkeitsgrad. Zeige zuerst nur die Aufgabe, dann nach einer Leerzeile „Lösung:“ mit kurzer Erklärung.',frei:extra||''}[kind];
   if(!ask){out.textContent='Bitte zuerst eine Frage eingeben.';return;}
   out.textContent='Denkt nach …';out.classList.add('busy');
   try{
-    const r=await AI(`Du bist ein freundlicher, präziser Lern-Coach für den Aufnahmetest der österreichischen Polizei (Steiermark). Antworte auf Deutsch (österreichisch, Du-Form), kurz, ohne Markdown-Überschriften. Erfinde keine Fakten über das Aufnahmeverfahren.\n\n${ctx}\n\nAuftrag: ${ask}`,{modelTier:'quick',onText:({text})=>{out.textContent=text;}});
-    out.textContent=r.text;
-  }catch(e){out.textContent=e&&e.code==='rate_limited'?'Gerade zu viele Anfragen. Bitte kurz warten.':e&&e.code==='not_granted'?'KI-Coach wurde nicht erlaubt.':'KI-Coach gerade nicht erreichbar.';}
+    out.textContent=await llm(`Du bist ein freundlicher, präziser Lern-Coach für den Aufnahmetest der österreichischen Polizei (Steiermark). Antworte auf Deutsch (österreichisch, Du-Form), kurz, ohne Markdown-Überschriften. Erfinde keine Fakten über das Aufnahmeverfahren.\n\n${ctx}\n\nAuftrag: ${ask}`,t=>{out.textContent=t;});
+  }catch(e){out.textContent=e&&e.code==='rate_limited'?'Gerade zu viele Anfragen. Bitte kurz warten.':e&&e.code==='key'?'Der Gemini-Schlüssel wurde abgelehnt. Prüfe ihn im Profil.':e&&e.code==='not_granted'?'KI-Coach wurde nicht erlaubt.':'KI-Coach gerade nicht erreichbar.';}
   out.classList.remove('busy');
 }
 async function askIV(i){
   const out=document.getElementById('ivo'+i),inp=document.getElementById('iva'+i);if(!out||!inp)return;
   const a=inp.value.trim();if(!a){out.textContent='Schreib zuerst deine Antwort.';return;}
   out.textContent='Denkt nach …';
-  try{const r=await AI(`Du bist Coach für das psychologische Gespräch beim Aufnahmeverfahren der österreichischen Polizei. Gib Feedback auf Deutsch (Du-Form), max. 6 kurze Punkte: was gut ist, was fehlt, ein besserer Formulierungsvorschlag. Ehrlich, nicht übertrieben lobend.\n\nFrage: ${IV[i][1]}\nTipp aus der App: ${IV[i][2]}\nAntwort des Bewerbers: ${a}`,{modelTier:'quick',onText:({text})=>{out.textContent=text;}});out.textContent=r.text;}
+  try{out.textContent=await llm(`Du bist Coach für das psychologische Gespräch beim Aufnahmeverfahren der österreichischen Polizei. Gib Feedback auf Deutsch (Du-Form), max. 6 kurze Punkte: was gut ist, was fehlt, ein besserer Formulierungsvorschlag. Ehrlich, nicht übertrieben lobend.\n\nFrage: ${IV[i][1]}\nTipp aus der App: ${IV[i][2]}\nAntwort des Bewerbers: ${a}`,t=>{out.textContent=t;});}
   catch(e){out.textContent='KI-Coach gerade nicht erreichbar.';}
 }
 function extPrompt(q){return `Ich übe für den Aufnahmetest der Polizei Österreich. Erkläre mir diese Aufgabe einfach:\n\n${q.q}\n${q.t==='mc'&&!q.oh?'Antworten: '+q.o.join(' | ')+'\n':''}Richtige Lösung: ${q.t==='mc'?(q.oh?'Grafik '+'ABCDEF'[q.ci]:q.o[q.ci]):q.t==='num'?fmt(q.ans):(q.ans||[])[0]}`;}
@@ -901,6 +1020,24 @@ document.addEventListener('click',ev=>{
   const a=b.dataset.a,v=b.dataset.v,x=b.dataset.x;
   switch(a){
    case 'tab':tab(v);break;
+   case 'weak':{const x=weakTags()[+b.dataset.i];if(x)start(x.g,weakItems(x),'learn');break;}
+   case 'qone':start('Nochmal üben',[Q(QBYID[x])],'learn');break;
+   case 'ndel':delete ST.notes[x];save();render();break;
+   case 'mkrun':start('Markierte Fragen',mix(Object.keys(ST.mk).filter(id=>QBYID[id])).map(id=>Q(QBYID[id])),'learn');break;
+   case 'unmk':delete ST.mk[x];save();render();break;
+   case 'sqrun':{const f=SQ.trim().toLowerCase();start('Suche: '+SQ,Object.values(QBYID).filter(q=>(String(q.q)+' '+(q.e||'')+' '+(q.tag||'')).toLowerCase().includes(f)).slice(0,40).map(q=>Q(q)),'learn');break;}
+   case 'deck':K={d:x,list:bankPick(x,20),i:0,ok:0,flip:false};render();window.scrollTo(0,0);break;
+   case 'kend':K=null;render();break;
+   case 'flip':K.flip=!K.flip;render();break;
+   case 'kr':{const q=K.list[K.i],ok=v==='1';const sv=S;S=null;record(prepQ(q),ok,null);S=sv;if(ok)K.ok++;K.i++;K.flip=false;render();window.scrollTo(0,0);break;}
+   case 'rkf':RK.f=v;RK.i=0;RK.show=false;render();break;
+   case 'rkshow':RK.show=true;render();break;
+   case 'rknext':RK.i++;RK.show=false;render();break;
+   case 'rkdel':delete ST.rk[x];RK.show=false;save();render();break;
+   case 'ru-del':ST.ruhe='';save();render();break;
+   case 'ru-w':{if(RU.w){clearInterval(RU.w.iv);RU.w=null;render();break;}RU.w={end:Date.now()+600000};RU.w.iv=setInterval(()=>{const el=document.getElementById('rutime');const r=RU.w?RU.w.end-Date.now():0;if(!RU.w||r<=0){if(RU.w)clearInterval(RU.w.iv);RU.w=null;if(el)el.textContent='Zeit um. Gut gemacht, jetzt kannst du loslegen.';const bt=document.querySelector('[data-a="ru-w"]');if(bt)bt.textContent='10-Minuten-Uhr starten';return;}if(el)el.textContent='Noch '+mmss(r/1000);},1000);render();const t=document.getElementById('rutxt');if(t)t.focus();break;}
+   case 'ru-b':{if(RU.b){clearTimeout(RU.b.to);RU.b=null;render();break;}RU.b={n:0};render();const step=()=>{const c=document.getElementById('brc'),l=document.getElementById('brl');if(!RU.b||!c)return;if(RU.b.n>=24){RU.b=null;c.className='brc';c.textContent='Fertig';if(l)l.textContent='Gut gemacht.';const bt=document.querySelector('[data-a="ru-b"]');if(bt)bt.textContent='Atmen starten';return;}const inh=RU.b.n%2===0;c.className='brc '+(inh?'in':'out');c.textContent=inh?'Ein':'Aus';if(l)l.textContent=(inh?'Einatmen':'Ausatmen')+' · Atemzug '+(Math.floor(RU.b.n/2)+1)+' von 12';RU.b.n++;RU.b.to=setTimeout(step,(inh?4:6)*1000);};requestAnimationFrame(()=>requestAnimationFrame(step));break;}
+   case 'ics':{try{const bl=new Blob([icsFile()],{type:'text/calendar'});const u=URL.createObjectURL(bl);const a2=document.createElement('a');a2.href=u;a2.download='aufnahmetest-erinnerung.ics';document.body.appendChild(a2);a2.click();setTimeout(()=>{URL.revokeObjectURL(u);a2.remove();},2000);}catch(e){toast('Download hier nicht möglich.');}break;}
    case 'au-eye':{const i=document.getElementById('aupw'),j=document.getElementById('aupw2');const sh=i.type==='password';i.type=sh?'text':'password';if(j)j.type=i.type;b.textContent=sh?'Verbergen':'Zeigen';break;}
    case 'dev-stats':devStats();break;
    case 'dev-lv':CATS.forEach(c=>{if(c.gen)ST.lv[c.id]=+v;});save();toast('Stufe '+v+' für alle Generatoren');render();break;
@@ -942,7 +1079,9 @@ document.addEventListener('click',ev=>{
    case 'cat':start(CAT[x].t,catItems(x),'learn');break;
    case 'scene':{const sc=SCENES.find(s=>s.id===x);start(sc.t,sceneBlock(sc),'scene');break;}
    case 'psg':{const p=PASS.find(p=>p.id===x);start(p.title,passBlock(p),'learn');break;}
-   case 'pick':answer(+b.dataset.i);break;
+   case 'pick':if(useConf()){S.sel=+b.dataset.i;render();const c=document.querySelector('.conf');if(c)c.scrollIntoView({behavior:'smooth',block:'nearest'});}else answer(+b.dataset.i);break;
+   case 'conf':{const q=S.items[S.i].q;if(q.t==='mc'){if(S.sel!=null)answer(S.sel,+b.dataset.f);}else{const i=document.getElementById('ans');answer(i?i.value:'',+b.dataset.f);}break;}
+   case 'star':{const id=S.items[S.i].q.id;if(ST.mk[id])delete ST.mk[id];else ST.mk[id]=Date.now();save();render();break;}
    case 'next':nextItem();break;
    case 'zoom':S.zoom=!S.zoom;render();break;
    case 'quit':if(S.mode==='exam'||S.res.length){sheet(`<h2>Runde beenden?</h2><p class="sub">${S.res.length} Antworten sind gespeichert.</p><div class="stackb"><button class="btn dark" data-a="quit-eval">Beenden und auswerten</button><button class="btn ghost" data-a="sclose">Weitermachen</button></div>`);}else{clearInterval(tick);S=null;stopSpeak();render();}break;
@@ -979,14 +1118,19 @@ document.addEventListener('click',ev=>{
    case 'reset-go':{closeSheet();const acct=ST.acct;ST=fresh();ST.acct=acct;save();OB=0;V={tab:'home',view:'home',arg:null,seg:'t1'};render();break;}
   }
 });
-document.addEventListener('submit',ev=>{if(ev.target.closest('[data-a="au-form"]')){ev.preventDefault();sbSubmit();return;}const f=ev.target.closest('[data-a="numform"]');if(!f)return;ev.preventDefault();const i=document.getElementById('ans');answer(i?i.value:'');});
+document.addEventListener('submit',ev=>{if(ev.target.closest('[data-a="au-form"]')){ev.preventDefault();sbSubmit();return;}const f=ev.target.closest('[data-a="numform"]');if(!f)return;ev.preventDefault();if(useConf()){toast('Wähle unten, wie sicher du bist.');return;}const i=document.getElementById('ans');answer(i?i.value:'');});
 document.addEventListener('input',ev=>{
   const t=ev.target;
-  if(t.id==='note'){const id=t.dataset.nid;if(t.value.trim())ST.notes[id]=t.value;else delete ST.notes[id];clearTimeout(t._t);t._t=setTimeout(save,600);}
+  if(t.id==='nsearch'){NF=t.value;clearTimeout(t._t);t._t=setTimeout(()=>{render();const n=document.getElementById('nsearch');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length);}},300);}
+  if(t.id==='qsearch'){SQ=t.value;clearTimeout(t._t);t._t=setTimeout(()=>{render();const n=document.getElementById('qsearch');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length);}},400);}
+  if(t.id==='rutxt'){ST.ruhe=t.value;clearTimeout(t._t);t._t=setTimeout(save,500);}
+  if(t.id==='note'){const id=t.dataset.nid;const q=S&&S.items[S.i]&&S.items[S.i].q;if(t.value.trim())ST.notes[id]={t:t.value,q:q?String(q.q).slice(0,300):'',a:q?rightPlain(q):'',c:q?q.cat:'',id:q&&q.id||'',ts:Date.now()};else delete ST.notes[id];clearTimeout(t._t);t._t=setTimeout(save,600);}
   if(t.dataset&&t.dataset.a==='rate'){ST.tts.rate=+t.value;setRateLive();const l=document.getElementById('rtv');if(l)l.textContent=String(ST.tts.rate).replace('.',',')+'×';clearTimeout(t._t);t._t=setTimeout(save,400);}
 });
 document.addEventListener('change',ev=>{
   const t=ev.target;
+  if(t.id==='gkey'){ST.gkey=t.value.trim();save();toast(ST.gkey?'Gemini-Schlüssel gespeichert':'Schlüssel entfernt');render();}
+  if(t.id==='remt'){ST.rem=t.value||'18:00';save();}
   if(t.id==='sppu'||t.id==='sprun'){ST.sp=ST.sp||{};ST.sp[t.id==='sppu'?'pu':'run']=t.value.trim();save();render();}
   if(t.id==='pname'){ST.name=t.value.trim().slice(0,30);save();}
   if(t.id==='ptest'){ST.test=t.value;ST.plan=null;save();render();}
