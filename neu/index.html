@@ -178,8 +178,6 @@ ul.lx{padding-left:20px;margin:6px 0 10px}ul.lx li{margin:4px 0}
 .psum summary{cursor:pointer;font-weight:600;color:var(--tint)}.ptx{white-space:pre-line;margin-top:8px;font-size:15px;line-height:1.55}
 .scimg{position:relative;display:block;width:100%;padding:0;border:0;border-radius:18px;overflow:hidden;cursor:zoom-in;background:#000;margin:10px 0}
 .scimg img{display:block;width:100%;height:auto}.zb{position:absolute;right:10px;bottom:10px;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:flex;align-items:center;justify-content:center}
-.zov{position:fixed;inset:0;z-index:50;background:#000;overflow:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:zoom-out}
-.zov img{width:200%;max-width:none;height:auto}@media (orientation:landscape){.zov img{width:100%}}
 .studt{display:flex;align-items:center;gap:10px;margin:8px 0}.studt b{font-variant-numeric:tabular-nums;min-width:44px;text-align:right}
 .memo{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px 16px;font-size:19px;font-variant-numeric:tabular-nums}
 .memo span{color:var(--ink2)}.memo b{text-align:right;overflow-wrap:anywhere}
@@ -264,6 +262,19 @@ form.card .lnk{display:block;margin:6px auto 0}
 .brw{display:flex;flex-direction:column;align-items:center;gap:8px}.brc{width:132px;height:132px;border-radius:50%;background:var(--tint-bg);border:2px solid var(--tint);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--tint);transform:scale(.72)}
 .brc.in{transform:scale(1);transition:transform 4s ease-in-out}.brc.out{transform:scale(.72);transition:transform 6s ease-in-out}
 .legacy .card{margin:12px 0}.legacy .note{font-size:12px;color:var(--mute);margin:12px 4px}.legacy table.t{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px}.legacy table.t td{border-top:.5px solid var(--sep);padding:7px 4px;vertical-align:top}.legacy table.t td:first-child{white-space:nowrap;color:var(--mute);padding-right:10px}.legacy ul,.legacy ol{padding-left:18px}.legacy .sec{margin:22px 6px 8px}.legacy a{color:var(--tint)}
+.zv{position:fixed;inset:0;z-index:80;background:#000;display:flex;flex-direction:column;color:#fff}
+.zvh{display:flex;align-items:center;gap:8px;padding:calc(8px + env(safe-area-inset-top)) 10px 8px 16px;background:rgba(0,0,0,.85)}
+.zvt{flex:1;min-width:0;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zvz{font-size:13px;font-weight:700;min-width:48px;text-align:center;font-variant-numeric:tabular-nums;opacity:.85}
+.zvbtn{width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;font-size:24px;font-weight:600;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.zvbtn.x{background:#fff;color:#000}
+.zvb{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-x pan-y;display:grid;place-items:center}
+.zvb.zoomed{display:block}
+.zvi{margin:auto}.zvb.zoomed .zvi{margin:0 auto}.zvi img,.zvi svg{display:block;width:100%;height:auto;max-width:none;user-select:none;-webkit-user-select:none}
+.zvi svg{background:#fff;border-radius:8px}
+.zvf{font-size:12px;text-align:center;padding:8px 12px calc(10px + env(safe-area-inset-bottom));opacity:.7}
+body.zvopen{overflow:hidden}
+.zbtn{margin:-4px 0 8px}
 /* Lösungsdarstellungen aus der Aufgaben-Engine */
 .mat{border-collapse:collapse;margin:4px auto}.mat td{border:1.5px solid var(--sep);width:52px;height:44px;text-align:center;font-weight:600;font-size:20px;font-variant-numeric:tabular-nums}
 .plate{display:inline-flex;align-items:center;gap:10px;background:#fff;color:#111;border:3px solid #111;border-radius:8px;padding:4px 14px 4px 0;font-family:ui-monospace,Menlo,monospace;font-size:26px;font-weight:800;letter-spacing:.06em;box-shadow:inset 0 5px 0 #C8102E,inset 0 -5px 0 #C8102E;overflow:hidden}

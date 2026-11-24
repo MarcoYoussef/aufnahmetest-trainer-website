@@ -750,6 +750,44 @@ function icsFile(){
   const url=location.href.split('#')[0];
   return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Aufnahmetest Trainer//DE','BEGIN:VEVENT','UID:atn-'+Date.now()+'@aufnahmetest','DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z','DTSTART:'+ds,'DURATION:PT20M','RRULE:FREQ=DAILY;COUNT=60','SUMMARY:Aufnahmetest üben (20 Min.)','DESCRIPTION:Tagesplan im Aufnahmetest Trainer: '+url,'BEGIN:VALARM','TRIGGER:PT0M','ACTION:DISPLAY','DESCRIPTION:Zeit zum Üben','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
 }
+
+/* ================= Bild-Betrachter: Einpassen, Zoomen (Knöpfe, Doppeltippen, zwei Finger), Verschieben ================= */
+const ZV={z:1,el:null};
+function zvOpen(html,title){
+  zvClose();ZV.z=1;
+  const d=document.createElement('div');d.className='zv';d.setAttribute('role','dialog');d.setAttribute('aria-modal','true');d.setAttribute('aria-label',title||'Bild');
+  d.innerHTML=`<div class="zvh"><span class="zvt">${H(title||'')}</span><button class="zvbtn" data-zv="out" aria-label="Verkleinern">−</button><span class="zvz" aria-live="polite">100 %</span><button class="zvbtn" data-zv="in" aria-label="Vergrößern">+</button><button class="zvbtn x" data-zv="close" aria-label="Schließen">${ICO(I.x,20)}</button></div><div class="zvb"><div class="zvi">${html}</div></div><div class="zvf">Doppeltippen oder mit zwei Fingern zoomen · ziehen zum Verschieben</div>`;
+  document.body.appendChild(d);document.body.classList.add('zvopen');ZV.el=d;
+  const b=d.querySelector('.zvb');
+  d.addEventListener('click',e=>{const k=e.target.closest('[data-zv]');if(!k)return;const a=k.dataset.zv;if(a==='close')zvClose();else zvSet(ZV.z*(a==='in'?1.5:1/1.5));});
+  let lastTap=0;
+  b.addEventListener('dblclick',e=>{zvTap(e.clientX,e.clientY);});
+  b.addEventListener('touchend',e=>{if(e.touches.length||e.changedTouches.length!==1)return;const t=Date.now();if(t-lastTap<300){const c=e.changedTouches[0];zvTap(c.clientX,c.clientY);e.preventDefault();lastTap=0;}else lastTap=t;},{passive:false});
+  let pin=null;
+  b.addEventListener('touchstart',e=>{if(e.touches.length===2){const [p,q]=e.touches;pin={d:Math.hypot(p.clientX-q.clientX,p.clientY-q.clientY),z:ZV.z,x:(p.clientX+q.clientX)/2,y:(p.clientY+q.clientY)/2};}},{passive:true});
+  b.addEventListener('touchmove',e=>{if(pin&&e.touches.length===2){e.preventDefault();const [p,q]=e.touches;const dd=Math.hypot(p.clientX-q.clientX,p.clientY-q.clientY);zvSet(pin.z*dd/pin.d,pin.x,pin.y);}},{passive:false});
+  b.addEventListener('touchend',e=>{if(e.touches.length<2)pin=null;});
+  b.addEventListener('wheel',e=>{if(e.ctrlKey){e.preventDefault();zvSet(ZV.z*(e.deltaY<0?1.1:1/1.1),e.clientX,e.clientY);}},{passive:false});
+  zvSet(1);const im=d.querySelector('.zvi img');if(im&&!im.complete)im.addEventListener('load',()=>zvSet(ZV.z),{once:true});window.addEventListener('resize',zvFit);const c=d.querySelector('[data-zv="close"]');if(c)c.focus();
+}
+function zvTap(x,y){zvSet(ZV.z>1.4?1:2.5,x,y);}
+function zvSet(z,cx,cy){
+  const d=ZV.el;if(!d)return;const b=d.querySelector('.zvb'),i=d.querySelector('.zvi');
+  z=Math.max(1,Math.min(5,z));const r=b.getBoundingClientRect();
+  if(cx==null){cx=r.left+r.width/2;cy=r.top+r.height/2;}
+  const ox=(b.scrollLeft+cx-r.left)/ZV.z,oy=(b.scrollTop+cy-r.top)/ZV.z;
+  const el=i.firstElementChild;let ar=1.6;
+  if(el&&el.tagName==='IMG'&&el.naturalWidth)ar=el.naturalWidth/el.naturalHeight;
+  else if(el&&el.viewBox&&el.viewBox.baseVal&&el.viewBox.baseVal.height)ar=el.viewBox.baseVal.width/el.viewBox.baseVal.height;
+  const base=Math.min(r.width,(r.height-8)*ar);
+  ZV.z=z;i.style.width=Math.round(base*z)+'px';i.style.marginTop=z>1.01?Math.max(0,(r.height-base*z/ar)/2)+'px':'';
+  b.scrollLeft=ox*z-(cx-r.left);b.scrollTop=oy*z-(cy-r.top);
+  b.classList.toggle('zoomed',z>1.01);
+  const l=d.querySelector('.zvz');if(l)l.textContent=Math.round(z*100)+' %';
+}
+function zvFit(){if(ZV.el)zvSet(ZV.z);}
+function zvClose(){window.removeEventListener('resize',zvFit);if(ZV.el){ZV.el.remove();ZV.el=null;}document.body.classList.remove('zvopen');}
+document.addEventListener('keydown',e=>{if(!ZV.el)return;if(e.key==='Escape'){zvClose();e.stopPropagation();}else if(e.key==='+'||e.key==='=')zvSet(ZV.z*1.5);else if(e.key==='-')zvSet(ZV.z/1.5);},true);
 /* ================= Runde (Session) ================= */
 function start(title,items,mode,meta){
   items=items.filter(Boolean);if(!items.length){toast('Gerade keine Aufgaben verfügbar.');return;}
@@ -776,9 +814,9 @@ function sessView(){
   const it=S.items[S.i];
   if(it.k==='scene'){const sc=it.sc;return `<div class="sw2">${sessHead()}<div class="kick">Merkfähigkeit · ${H(S.title)}</div><h2 class="st2">Präg dir das Bild genau ein</h2>
     <p class="sub">Danach kommen ${sc.qs.length} Fragen ohne Bild. Achte auf Uhrzeiten, Schilder, Farben, Personen und Gegenstände.</p>
-    <button class="scimg" data-a="zoom" aria-label="Bild vergrößern"><img src="${sc.img}" alt="Tatort-Bild: ${H(sc.t)}"><span class="zb">${ICO(I.zoom,18)}</span></button>
+    <button class="scimg" data-a="zoom" data-x="${H(sc.img)}" data-t="${H(sc.t)}" aria-label="Bild vergrößern"><img src="${sc.img}" alt="Tatort-Bild: ${H(sc.t)}"><span class="zb">${ICO(I.zoom,18)}</span></button>
     <div class="studt"><span class="track"><i id="studbar" style="width:100%"></i></span><b id="stud">${mmss(sc.secs)}</b></div>
-    <button class="btn dark" data-a="next">Ich bin bereit</button>${S.zoom?`<div class="zov" data-a="zoom"><img src="${sc.img}" alt=""><span class="fine">Tippen zum Schließen</span></div>`:''}</div>`;}
+    <button class="btn dark" data-a="next">Ich bin bereit</button></div>`;}
   if(it.k==='memo'){return `<div class="sw2">${sessHead()}<div class="kick">Merkfähigkeit</div><h2 class="st2">Einprägen</h2><p class="sub">Danach kommen die Fragen, ohne diese Liste.</p>
     <div class="card memo">${it.m.memo}</div><div class="studt"><span class="track"><i id="studbar" style="width:100%"></i></span><b id="stud">${mmss(it.m.secs)}</b></div><button class="btn dark" data-a="next">Fertig, zu den Fragen</button></div>`;}
   if(it.k==='text'){const p=it.p;return `<div class="sw2">${sessHead()}<div class="kick">Textverständnis</div><h2 class="st2">${H(p.title)}</h2>
@@ -798,7 +836,7 @@ function sessView(){
   const passage=it.p?`<details class="card psum"><summary>Text nochmal anzeigen</summary><div class="ptx">${H(it.p.text)}</div></details>`:'';
   return `<div class="sw2">${sessHead()}
    <div class="chips"><span class="chip" style="background:${(AREA_COL[q.area]||['var(--fill)'])[0]};color:${(AREA_COL[q.area]||[0,'var(--ink)'])[1]}">${H(SHORT[q.area]||'Wissen')}${tag?' · '+H(tag):''}</span>${srsW&&!ex?'<span class="chip warnc">Kommt wieder: war falsch</span>':''}</div>
-   ${passage}${q.fig?`<div class="fig">${q.fig}</div>`:''}
+   ${passage}${q.fig?`<div class="fig qfig">${q.fig}</div><button class="pill zbtn" data-a="figzoom">${ICO(I.zoom,16)} Grafik vergrößern</button>`:''}
    ${qText(q)}
    ${opts}
    ${a&&!ex?feedback(it):''}
@@ -863,7 +901,7 @@ function record(q,ok,it){
   save();
 }
 function nextItem(){
-  stopSpeak();
+  stopSpeak();zvClose();
   if(S.i>=S.items.length-1){finish();return;}
   S.i++;S.ans=false;S.given=null;S.zoom=false;S.sel=null;S.qt=Date.now();
   const it=S.items[S.i];
@@ -872,7 +910,7 @@ function nextItem(){
   if(it.k==='q'&&it.q.t!=='mc'){const i=document.getElementById('ans');if(i)setTimeout(()=>i.focus(),50);}
 }
 function finish(){
-  clearInterval(tick);stopSpeak();
+  clearInterval(tick);stopSpeak();zvClose();
   const R=S.res,ok=R.filter(r=>r.ok).length,n=Math.max(R.length,qCount());
   const res={title:S.title,mode:S.mode,ok,n,R,items:S.items,meta:S.meta,dur:Date.now()-S.t0};
   if(S.mode==='plan'&&S.meta.unit!=null){const P=plan();if(!P.done.includes(S.meta.unit))P.done.push(S.meta.unit);}
@@ -894,7 +932,7 @@ function resultView(){
   const msg=p>=85?'Sehr stark.':p>=70?'Gut gemacht.':p>=50?'Solide Basis, da geht noch mehr.':'Dranbleiben, Fehler kommen gezielt wieder.';
   return `<div class="res"><div class="kick">${H(r.title)}</div><div class="bigp">${p} %</div><h1 class="lt">${msg}</h1><p class="lead">${r.ok} von ${r.n} richtig · Dauer ${mmss(r.dur/1000)}${r.mode==='exam'&&r.R.length<r.n?' · Zeit abgelaufen':''}</p></div>
    ${Object.keys(byA).length>1?`<div class="card">${Object.entries(byA).map(([a,v])=>`<div class="srow"><span>${H(SHORT[a]||'Wissen')}</span><b>${v.ok}/${v.n}</b></div>`).join('')}</div>`:''}
-   ${scImgs.map(sc=>`<details class="card"><summary><b>Bild nochmal ansehen: ${H(sc.t)}</b></summary><img class="rimg" src="${sc.img}" alt=""></details>`).join('')}
+   ${scImgs.map(sc=>`<details class="card"><summary><b>Bild nochmal ansehen: ${H(sc.t)}</b></summary><button class="scimg" data-a="rimg" data-x="${H(sc.img)}" data-t="${H(sc.t)}" aria-label="Bild vergrößern"><img src="${sc.img}" alt=""><span class="zb">${ICO(I.zoom,18)}</span></button></details>`).join('')}
    ${r.mode==='einst'?`<div class="card"><b>Deine Einstufung ist gespeichert.</b><p class="sub">Der Tagesplan auf „Heute“ richtet sich ab jetzt nach deinen schwächsten Bereichen.</p></div>`:''}
    <div class="sec">Alle Antworten</div><div class="card">${r.R.map(x=>`<details class="rv ${x.ok?'ok':'bad'}"><summary><span class="rd">${x.ok?'✓':'✕'}</span><span class="rq">${H(String(x.q.q).split('\n')[0].slice(0,110))}</span></summary>
      <div class="rvb">${x.q.fig?`<div class="fig">${x.q.fig}</div>`:''}<p class="pre">${H(x.q.q)}</p><p><small>Deine Antwort:</small> ${x.q.t==='mc'?(x.q.oh?x.q.o[x.g]:H(x.q.o[x.g])):H(x.g)}</p><p><small>Richtig:</small> ${rightAns(x.q)}</p>${x.q.e?`<p class="sub">${H(x.q.e)}</p>`:''}</div></details>`).join('')||'<p class="sub">Keine Antworten.</p>'}</div>
@@ -1083,7 +1121,9 @@ document.addEventListener('click',ev=>{
    case 'conf':{const q=S.items[S.i].q;if(q.t==='mc'){if(S.sel!=null)answer(S.sel,+b.dataset.f);}else{const i=document.getElementById('ans');answer(i?i.value:'',+b.dataset.f);}break;}
    case 'star':{const id=S.items[S.i].q.id;if(ST.mk[id])delete ST.mk[id];else ST.mk[id]=Date.now();save();render();break;}
    case 'next':nextItem();break;
-   case 'zoom':S.zoom=!S.zoom;render();break;
+   case 'zoom':zvOpen(`<img src="${H(x)}" alt="${H(b.dataset.t||'Bild')}" draggable="false">`,b.dataset.t||'Bild');break;
+   case 'figzoom':{const f=document.querySelector('.qfig');if(f)zvOpen(f.innerHTML,'Grafik');break;}
+   case 'rimg':zvOpen(`<img src="${H(x)}" alt="" draggable="false">`,b.dataset.t||'Bild');break;
    case 'quit':if(S.mode==='exam'||S.res.length){sheet(`<h2>Runde beenden?</h2><p class="sub">${S.res.length} Antworten sind gespeichert.</p><div class="stackb"><button class="btn dark" data-a="quit-eval">Beenden und auswerten</button><button class="btn ghost" data-a="sclose">Weitermachen</button></div>`);}else{clearInterval(tick);S=null;stopSpeak();render();}break;
    case 'quit-eval':closeSheet();finish();break;
    case 'sclose':closeSheet();break;
@@ -1140,7 +1180,7 @@ document.addEventListener('keydown',ev=>{
   const it=S.items[S.i];
   if(ev.key==='Enter'&&(S.ans||it.k!=='q')){ev.preventDefault();nextItem();}
   else if(it.k==='q'&&!S.ans&&it.q.t==='mc'&&/^[1-6a-fA-F]$/.test(ev.key)){const i=/\d/.test(ev.key)?+ev.key-1:'abcdef'.indexOf(ev.key.toLowerCase());if(i<it.q.o.length)answer(i);}
-  else if(ev.key==='Escape'&&S.zoom){S.zoom=false;render();}
+
 });
 if('speechSynthesis' in window)try{speechSynthesis.onvoiceschanged=()=>{};speechSynthesis.getVoices();}catch(e){}
 
